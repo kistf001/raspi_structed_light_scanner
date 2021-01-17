@@ -19,6 +19,15 @@ using namespace cv;
 using namespace std;
 
 //######################################################
+//# 장비정보
+//######################################################
+
+int adfadf = 600;
+
+int projector_map_shape_x = 1024;
+int projector_map_shape_y = 1024;
+
+float focus = 600;
 
 int w   = 640;//2592;
 int h   = 480;//1944;
@@ -35,19 +44,16 @@ int cols        =  4;
 int thresholder_black = 50;
 int thresholder_white = 50;
 
-VideoCapture cap(0);
-
-cv::Mat buffer ;
-int buffer_flag    = 0;
-int buffer_counter = 0;
-
+//######################################################
+//# 함수선언
 //######################################################
 
 void graycode_lookup_table(  int size,  uint16_t *Gray2Bin,  uint16_t *Bin2Gray  );
 
 void spliter(Mat &AAAA);
 void capture(VideoCapture &A, Mat &B);
-void aqqq(Mat &frame);
+void camera1(Mat &frame);
+void camera2(Mat &frame);
 
 void image_to_plane( Mat &gray );
 Mat  image_to_bit( Mat &standard_L, Mat &standard_H,  Mat &img_A,  Mat &img_B  );
@@ -66,7 +72,7 @@ void line_plane_intersection( Scalar N, Scalar T, Mat &p2,  int h,  int w );
 void processing( VideoCapture &cap );
 
 //######################################################
-//#
+//# 수표현도구
 //######################################################
 
 uint16_t Gray2Bin[1024];
@@ -104,20 +110,17 @@ void spliter(Mat &AAAA){
     //ch2 = channels[1];
     //ch3 = channels[2];
 }
-
 void capture(VideoCapture &A, Mat &B){
-    for ( int a = 0; a < 7; a++ ) A >> B;
+    A.grab(), A.grab(), A.grab(), A.grab(), A.grab(), A.grab(), A.retrieve(B); //A >> B;
     spliter(B);
 }
-
-void aqqq(Mat &frame){
+void camera1(Mat &frame){
     moveWindow( "camera1", 1, 1);
-    imshow    ( "camera1", frame);  
+    imshow    ( "camera1", frame); 
 }
-
 void camera2(Mat &frame){
     moveWindow( "camera2", 1, 1);
-    imshow    ( "camera2", frame);  
+    imshow    ( "camera2", frame);
 }
 
 //######################################################
@@ -396,77 +399,113 @@ void line_plane_intersection( Scalar N, Scalar T,  Mat &p2,  int h,  int w ){
 //#
 //######################################################
 
-void graycode_capture  ( VideoCapture &cap ){
-    
-    int thresholder_black = 50;
-    int thresholder_white = 50;
+VideoCapture cap(0);
 
-    int adfadf = 600;
+Mat buffersasasa(h, w, CV_16SC1);
 
-    Mat projector;
+int image_type    = 0;  // background--graycode
+int image_inv     = 0;  // graycode
+int image_dir     = 0;  // graycode
+int image_stage   = 0;  // graycode
+int image_onoff   = 0;  // background
+int ready_flag    = 0;
+int capture_algorithm_state = 0;
+void capture_algorithm  ( VideoCapture &cap ) {
 
-    Mat black     (h, w, CV_16SC1);
-    Mat white     (h, w, CV_16SC1);
-    Mat buffer    (h, w, CV_16SC1);
-    Mat buffer_inv(h, w, CV_16SC1);
-    Mat bit_h     (h, w, CV_16UC1);
-    Mat bit_v     (h, w, CV_16UC1);
-    Mat bit_buffer(h, w, CV_16UC1);
+    static Mat projector;
 
     //######################################################
+    //#
+    //######################################################
+    while (capture_algorithm_state) {
 
-    projector = projector_map_LAMP(  1024,  1024,  0  );
-    camera2(projector);
-    waitKey(1000);
-    capture(cap, black);
-    for ( int stage = 0; stage < 10; stage++ )  
-    {
+        if(ready_flag == 0){
 
-        /* graycode_h */
-        projector = projector_map_GRAY(  1024, 1024,  stage,  0,  'h'  );
-        camera2(projector);
-        waitKey(adfadf);
-        capture(cap, buffer);
+            if (image_type == 0) {
+                projector = projector_map_LAMP(  1024,  1024,  image_onoff  );
+                camera2(projector);
+                waitKey(adfadf);
+                capture(cap, buffersasasa);
+                ready_flag = 1;
+            } 
 
-        projector = projector_map_GRAY(  1024, 1024,  stage,  1,  'h'  );
-        camera2(projector);
-        waitKey(adfadf);
-        capture(cap, buffer_inv);
-        
+            else if (image_type == 1) {
+                projector = projector_map_GRAY(  1024, 1024,  image_stage,  image_inv,  image_dir  );
+                camera2(projector);
+                waitKey(adfadf);
+                capture(cap, buffersasasa);
+                ready_flag = 1;
+            }
+
+            else if (image_type == 2) {
+                capture(cap, buffersasasa);
+                ready_flag = 1;
+            }
+
+        }
+
     }
+    //######################################################
 
-    projector = projector_map_LAMP(  1024,  1024,  0  );
-    camera2(projector);
-    waitKey(1000);
-    capture(cap, black);
 
-    projector = projector_map_LAMP(  1024,  1024,  1  );
-    camera2(projector);
-    waitKey(adfadf);
-    capture(cap, white);
+    //######################################################
+    //#
+    //######################################################
+    if(capture_algorithm_state==0){
+
+        image_type    = 0;
+        image_inv     = 0;
+        image_dir     = 0;
+        image_stage   = 0;
+        image_onoff   = 0;
+        ready_flag    = 0;
+
+    }
+    //######################################################
+
+}
+void capture_algorithm_start(){
+    capture_algorithm_state = 1;
+}
+void capture_algorithm_stop (){
+    capture_algorithm_state = 0;
+}
+void capture_background( Mat &aafsa, int color ){
+
+    image_type  = 0;
+    image_onoff = color;
+
+    ready_flag = 0;
+    while (ready_flag==0) usleep(10000);
+    aafsa = buffersasasa;
+    ready_flag = 1;
     
-    for ( int stage = 0; stage < 10; stage++ )  
-    {
+}
+void capture_graycode  ( Mat &aafsa, int stage, int invert, int dir ){
+    
+    image_type    = 1;
+    image_inv     = invert;
+    image_dir     = dir;
+    image_stage   = stage;
 
-        /* graycode_v */
-        projector = projector_map_GRAY(  1024, 1024,  stage,  0,  'v'  );
-        camera2(projector);
-        waitKey(adfadf);
-        capture(cap, buffer);
+    ready_flag = 0;
+    while (ready_flag==0) usleep(10000);
+    aafsa = buffersasasa;
+    ready_flag = 1;
 
-        projector = projector_map_GRAY(  1024, 1024,  stage,  1,  'v'  );
-        camera2(projector);
-        waitKey(adfadf);
-        capture(cap, buffer_inv);
-        
-    }
+}
+void capture_plane     ( Mat &aafsa ){
+    
+    image_type    = 2;
+
+    ready_flag = 0;
+    while (ready_flag==0) usleep(40000);
+    aafsa = buffersasasa;
+    ready_flag = 1;
 
 }
 
-
-void processing0_ (){
-
-    /*
+void image_processing0(){
 
     Mat black     (h, w, CV_16SC1);
     Mat white     (h, w, CV_16SC1);
@@ -476,10 +515,11 @@ void processing0_ (){
     Mat bit_v     (h, w, CV_16UC1);
     Mat bit_buffer(h, w, CV_16UC1);
 
-    //######################################################
+    Mat bit_hasdas   (1024, 1024, CV_16UC1);
+    Mat bit_vasdas   (1024, 1024, CV_16UC1);
 
-    capture(cap, black);
-    capture(cap, white);
+    capture_background(black,0);
+    capture_background(white,1);
 
     black.convertTo(black, CV_16SC1);
     white.convertTo(white, CV_16SC1);
@@ -490,11 +530,11 @@ void processing0_ (){
     for ( int stage = 0; stage < 10; stage++ )  
     {
 
-        *//* graycode_h *//*
-        capture(cap, buffer);
-        capture(cap, buffer_inv);
+        /* graycode_h */
+        capture_graycode(      buffer,  stage,  0,  'h'  );
+        capture_graycode(  buffer_inv,  stage,  1,  'h'  );
 
-        buffer    .convertTo(buffer    , CV_16SC1);
+        buffer    .convertTo(    buffer, CV_16SC1);
         buffer_inv.convertTo(buffer_inv, CV_16SC1);
 
         bit_buffer = image_to_bit(  black,  white,  buffer,  buffer_inv  );
@@ -506,23 +546,12 @@ void processing0_ (){
         
     }
     
-    //######################################################
-
-    capture(cap, black);
-    capture(cap, white);
-
-    black.convertTo(black, CV_16SC1);
-    white.convertTo(white, CV_16SC1);
-
-    black += thresholder_black;
-    white -= thresholder_white;
-    
     for ( int stage = 0; stage < 10; stage++ )  
     {
 
-        *//* graycode_v *//*
-        capture(cap, buffer);
-        capture(cap, buffer_inv);
+        /* graycode_v */
+        capture_graycode(      buffer,  stage,  0,  'v'  );
+        capture_graycode(  buffer_inv,  stage,  1,  'v'  );
         
         buffer    .convertTo(buffer    , CV_16SC1);
         buffer_inv.convertTo(buffer_inv, CV_16SC1);
@@ -536,164 +565,75 @@ void processing0_ (){
         
     }
 
-    bit_to_cordination(  bit_h,bit_v,  bit_hasdas,bit_vasdas,  h,w,  1024,1024  );
-   */
-}
-void processing0__( VideoCapture &cap ){
+    Mat ssbit_h = bit_h*(1<<6);
+    camera2(ssbit_h);
+    waitKey(6000);
 
-    int w   = 640;//2592;
-    int h   = 480;//1944;
-    int bit =  10;//  10;
-    int thresholder_black = 50;
-    int thresholder_white = 50;
-
-    int adfadf = 600;
-
-    Mat projector;
-
-    Mat black     (h, w, CV_16SC1);
-    Mat white     (h, w, CV_16SC1);
-    Mat buffer    (h, w, CV_16SC1);
-    Mat buffer_inv(h, w, CV_16SC1);
-    Mat bit_h     (h, w, CV_16UC1);
-    Mat bit_v     (h, w, CV_16UC1);
-    Mat bit_buffer(h, w, CV_16UC1);
-
-    //######################################################
-
-    projector = projector_map_LAMP(  1024,  1024,  0  );
-    camera2(projector);
-    waitKey(1000);
-    camera2(projector);
-    waitKey(1000);
-    capture(cap, black);
-
-    projector = projector_map_LAMP(  1024,  1024,  1  );
-    camera2(projector);
-    waitKey(adfadf);
-    capture(cap, white);
-
-    black.convertTo(black, CV_16SC1);
-    white.convertTo(white, CV_16SC1);
-
-    black += thresholder_black;
-    white -= thresholder_white;
-
-    for ( int stage = 0; stage < 10; stage++ )  
-    {
-
-        /* graycode_h */
-        projector = projector_map_GRAY(  1024, 1024,  stage,  0,  'h'  );
-        camera2(projector);
-        waitKey(adfadf);
-        capture(cap, buffer);
-
-        projector = projector_map_GRAY(  1024, 1024,  stage,  1,  'h'  );
-        camera2(projector);
-        waitKey(adfadf);
-        capture(cap, buffer_inv);
-
-        buffer    .convertTo(buffer    , CV_16SC1);
-        buffer_inv.convertTo(buffer_inv, CV_16SC1);
-
-        bit_buffer = image_to_bit(  black,  white,  buffer,  buffer_inv  );
-        bit_buffer.convertTo(bit_buffer, CV_16UC1);
-
-        image_to_bit_stacking(  bit_h,  bit_buffer,  stage  );
-
-        printf("%d\n",stage);
-        
-    }
-
-    Mat bit_hqwe = bit_h*(1<<6);
-    camera2(bit_hqwe);
-    waitKey(12500);
-    
-    //######################################################
-
-    projector = projector_map_LAMP(  1024,  1024,  0  );
-    camera2(projector);
-    waitKey(1000);
-    camera2(projector);
-    waitKey(1000);
-    capture(cap, black);
-
-    projector = projector_map_LAMP(  1024,  1024,  1  );
-    camera2(projector);
-    waitKey(adfadf);
-    capture(cap, white);
-
-    black.convertTo(black, CV_16SC1);
-    white.convertTo(white, CV_16SC1);
-
-    black += thresholder_black;
-    white -= thresholder_white;
-    
-    for ( int stage = 0; stage < 10; stage++ )  
-    {
-
-        /* graycode_v */
-        projector = projector_map_GRAY(  1024, 1024,  stage,  0,  'v'  );
-        camera2(projector);
-        waitKey(adfadf);
-        capture(cap, buffer);
-
-        projector = projector_map_GRAY(  1024, 1024,  stage,  1,  'v'  );
-        camera2(projector);
-        waitKey(adfadf);
-        capture(cap, buffer_inv);
-        
-        buffer    .convertTo(buffer    , CV_16SC1);
-        buffer_inv.convertTo(buffer_inv, CV_16SC1);
-
-        bit_buffer = image_to_bit(  black,  white,  buffer,  buffer_inv  );
-        bit_buffer.convertTo(bit_buffer, CV_16UC1);
-
-        image_to_bit_stacking(  bit_v,  bit_buffer,  stage  );
-
-        printf("%d\n",stage);
-        
-    }
-
-    Mat dfdbit_v = bit_v*(1<<6);
-    camera2(dfdbit_v);
-    waitKey(12500);
+    Mat ssbit_v = bit_v*(1<<6);
+    camera2(ssbit_v);
+    waitKey(6000);
 
     //######################################################
     //#
     //######################################################
 
-    Mat bit_hasdas   (1024, 1024, CV_16UC1);
-    Mat bit_vasdas   (1024, 1024, CV_16UC1);
-
     bit_to_cordination(  bit_h,bit_v,  bit_hasdas,bit_vasdas,  h,w,  1024,1024  );
 
     bit_hasdas = bit_hasdas*100;
     camera2(bit_hasdas);
-    waitKey(12500);
+    waitKey(6000);
+
     bit_vasdas = bit_vasdas*100;
     camera2(bit_vasdas);
-    waitKey(12500);
+    waitKey(6000);
+
+
+    //######################################################
+    //# 좌표를 3차원으로 바꾸고 
+    //######################################################
+
+    Mat adsadasdas   (1024, 1024, CV_32FC3);
+    
+    uint16_t * x = (uint16_t*) bit_hasdas.data;
+    uint16_t * y = (uint16_t*) bit_vasdas.data;
+    float    * w = (float   *) adsadasdas.data;
+    
+    uint64_t counter  = 0;
+
+    for (uint32_t y = 0; y < projector_map_shape_y; y++)
+    {
+        for (uint32_t x = 0; x < projector_map_shape_x; x++)
+        {
+            w[counter  ] = x;
+            w[counter+1] = y;
+            w[counter+2] = focus;
+            counter += 3;
+        }
+    }
+    
+    adsadasdas = adsadasdas/600;
+    camera2(adsadasdas);
+    waitKey(6000);
     
 }
-void processing1  ( VideoCapture &cap ){
+void image_processing1(){
 
+    capture_plane( gray );
+    //image_to_plane( gray );
+    //processing0( cap );
+    //cv::Mat point(  cv::Size(3, 3),  CV_32FC3,  Scalar(   1,   1, 100  )  );
+    //line_plane_intersection( 
+    //    Scalar(  0,  0.5,  0.5  ),  Scalar(  222,  222,  222  ), 
+    //    point,  3,  3
+    //);
+    
 }
 
 void thread_camera(){
 
-    if (!cap.isOpened())  printf("카메라를 열수 없습니다. \n");  
-
-	cap.set( CAP_PROP_FRAME_WIDTH , w );
-	cap.set( CAP_PROP_FRAME_HEIGHT, h );
-	cap.set( CAP_PROP_ISO_SPEED, 100 );
-	//cap.set( CAP_PROP_EXPOSURE, 0.1 );
-	cap.set( CAP_PROP_FPS, 10);
-
     while(1){
-
-        //usleep(10000);
-        graycode_capture(cap);
+        usleep(5000);
+        capture_algorithm(cap);
         //if(buffer_flag==0) capture(cap, buffer), buffer_flag = 1, buffer_counter++;
         //cout << "captured!\n"<<buffer_counter<<endl<<endl;
         //printf("bbbbbbbbbbbbbbb\n");
@@ -702,18 +642,27 @@ void thread_camera(){
 }
 void thread_main  (){
     
-    //######################################################
-    clock_t start, start1, end, end1;
-    double result, result1;
-    int i,j;
-    int sum = 0;
-    start = clock(); //시간 측정 시작
-    start1 = time(NULL); // 시간 측정 시작
-    //######################################################
+    ////######################################################
+    //clock_t start, start1, end, end1;
+    //double result, result1;
+    //int i,j;
+    //int sum = 0;
+    //start = clock(); //시간 측정 시작
+    //start1 = time(NULL); // 시간 측정 시작
+    ////######################################################
 
-    graycode_lookup_table(  10,  Gray2Bin,  Bin2Gray  );
+    graycode_lookup_table(  bit,  Gray2Bin,  Bin2Gray  );
+
     namedWindow("camera1", 1);
     namedWindow("camera2", 1);
+
+    if (!cap.isOpened())  printf("카메라를 열수 없습니다. \n");  
+
+	cap.set( CAP_PROP_FRAME_WIDTH , w );
+	cap.set( CAP_PROP_FRAME_HEIGHT, h );
+	cap.set( CAP_PROP_ISO_SPEED, 100 );
+	//cap.set( CAP_PROP_EXPOSURE, 0.1 );
+	cap.set( CAP_PROP_FPS, 30);
 
     //######################################################
     //#
@@ -728,63 +677,47 @@ void thread_main  (){
     vector<Point2f> imagePoint;
     Size patternsize(7,4); //interior number of corners
 
-    for( int k = 0; k < cols; k++ )
-        for( int j = 0; j < rows; j++ )
+    for ( int k = 0; k < cols; k++ )
+        for ( int j = 0; j < rows; j++ )
             objectPoints.push_back(cv::Point3f(float( k*square_size ), float( j*square_size ), 0));
 
     //######################################################
     //#
     //######################################################
+
+    sleep(5);
+
+    while (1) {
     
-    while(1){
+        capture_algorithm_stop ();
+        capture_algorithm_start();
 
         printf("aaaaaaaaaaaaaaaaaaa\n");
         
-        usleep(10000);
-        //if(buffer_flag!=0) buffer_flag = 0, aqqq(buffer), waitKey(20);
+        image_processing0();
+        image_processing1();
 
     }
    
-    //######################################################
-    end     = clock(); //시간 측정 끝
-    end1    = time(NULL); // 시간 측정 끝
-    result  = (double)(end - start);
-    result1 = (double)(end1 - start1);
-    printf("%f\n", result);
-    printf("%f\n", result1); //결과 출력
-    //######################################################
+    ////######################################################
+    //end     = clock(); //시간 측정 끝
+    //end1    = time(NULL); // 시간 측정 끝
+    //result  = (double)(end - start);
+    //result1 = (double)(end1 - start1);
+    //printf("%f\n", result);
+    //printf("%f\n", result1); //결과 출력
+    ////######################################################
     
 }
 
-int main(int, char**)
-{   
+int main (int, char**) {   
 
+    printf("aaaaaaaaaaaaaaaaaaa");
+    printf("aaaaaaaaaaaaaaaaaaa");
     thread hi0(thread_main  );
     thread hi1(thread_camera);
     hi0.join();
     hi1.join();
-    printf("aaaaaaaaaaaaaaaaaaa");
-    printf("aaaaaaaaaaaaaaaaaaa");
-
-    //while(1){
-        
-    //}
-
-    //capture( cap, gray );
-
-    /*
-    image_to_plane( gray );
     
-    processing0( cap );
-
-    cv::Mat point(  cv::Size(3, 3),  CV_32FC3,  Scalar(   1,   1, 100  )  );
-
-    line_plane_intersection( 
-        Scalar(    0,  0.5,  0.5  ),  Scalar(  222,  222,  222  ), 
-        point,  3,  3
-    );
-    */
-  
     return 0;
-
 }
