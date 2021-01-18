@@ -55,7 +55,7 @@ void capture(VideoCapture &A, Mat &B);
 void camera1(Mat &frame);
 void camera2(Mat &frame);
 
-void image_to_plane( Mat &gray );
+void image_to_plane( Mat &gray, Scalar &aaaaaadfffff );
 Mat  image_to_bit( Mat &standard_L, Mat &standard_H,  Mat &img_A,  Mat &img_B  );
 void image_to_bit_stacking( Mat &stack, Mat &bit, int stage );
 void bit_to_cordination( 
@@ -127,7 +127,7 @@ void camera2(Mat &frame){
 //# processing
 //######################################################
 
-void image_to_plane( Mat &gray ){
+void image_to_plane( Mat &gray, float *aaaaaadfffff ){
     
     int w   = 640;//2592;
     int h   = 480;//1944;
@@ -190,13 +190,26 @@ void image_to_plane( Mat &gray ){
         transpose(rotation_vector, rotation_vector);
         rotation_vector.convertTo(rotation_vector, CV_32FC1);
         tvecs          .convertTo(tvecs          , CV_32FC1);
-            
+
         float a[1][3] = {{ 0, 0, 1}};
         Mat AA = Mat(1, 3, CV_32FC1, a);
         Mat nomal_vector;
         nomal_vector = AA * rotation_vector;
-        cout << "nomal_vector" << endl << " " << nomal_vector << endl << endl << endl;
+        //cout << "nomal_vector" << endl << " " << nomal_vector << endl << endl << endl;
+        //aaaaaadfffff = (Scalar)nomal_vector;
 
+        float *dfdf;
+
+        dfdf = (float*) nomal_vector.data;
+        aaaaaadfffff[0] = dfdf[0];
+        aaaaaadfffff[1] = dfdf[1];
+        aaaaaadfffff[2] = dfdf[2];
+        
+        dfdf = (float*) tvecs.data;
+        aaaaaadfffff[3] = dfdf[0];
+        aaaaaadfffff[4] = dfdf[1];
+        aaaaaadfffff[5] = dfdf[2];
+        
     }
 
 }
@@ -618,14 +631,27 @@ void image_processing0(){
 }
 void image_processing1(){
 
+    Mat gray;
+    float plane_vectors[] = {0,0,0,0,0,0};
     capture_plane( gray );
-    //image_to_plane( gray );
-    //processing0( cap );
+    image_to_plane( gray, plane_vectors );
+    //cout << "nomal_vector" << endl << " " << color2[0] << color2[1] << color2[2] << endl << endl << endl;
+
+    printf("%f, %f, %f,    %f, %f, %f \n\n",
+        plane_vectors[0], 
+        plane_vectors[1], 
+        plane_vectors[2],
+
+        plane_vectors[3], 
+        plane_vectors[4], 
+        plane_vectors[5]
+    );
     //cv::Mat point(  cv::Size(3, 3),  CV_32FC3,  Scalar(   1,   1, 100  )  );
     //line_plane_intersection( 
     //    Scalar(  0,  0.5,  0.5  ),  Scalar(  222,  222,  222  ), 
     //    point,  3,  3
     //);
+    
     
 }
 
@@ -694,7 +720,7 @@ void thread_main  (){
 
         printf("aaaaaaaaaaaaaaaaaaa\n");
         
-        image_processing0();
+        //image_processing0();
         image_processing1();
 
     }
