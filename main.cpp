@@ -225,42 +225,53 @@ void image_to_bit_stacking( Mat &stack, Mat &bit, int stage ){
 }
 
 void bit_to_cordination( 
-    Mat &horizontal, Mat &vertical, Mat &Map_h, Mat &Map_v, 
+    Mat &horizontal, Mat &vertical, Mat &Map_hv, 
     uint32_t h, uint32_t w, uint32_t h_im, uint32_t w_im  ){
     
     uint16_t * pt_horizontal = (uint16_t*) horizontal.data;
     uint16_t * pt_vertical   = (uint16_t*) vertical  .data;
-    uint16_t * pt_Map_h      = (uint16_t*) Map_h     .data;
-    uint16_t * pt_Map_v      = (uint16_t*) Map_v     .data;
+    float    * pt_Map_hv     = (float   *) Map_hv    .data;
 
-    uint32_t counter  = 0;
-    uint32_t counter1 = 0;
-    uint32_t asdasds  = 1024;
+    uint32_t right_point_counter = 0;
+    uint32_t counter             = 0;
+    uint32_t x_size              = 1024;
 
-    uint32_t a = 0;
-    uint32_t b = 0;
-    uint32_t c = 0;
+    uint64_t a = 0;
+    uint64_t b = 0;
+    uint64_t c = 0;
 
-    for (uint32_t y = 0; y < h; y++)
-    {
-        for (uint32_t x = 0; x < w; x++)
-        {
+    for (uint32_t y = 0; y < h; y++) {
+        for (uint32_t x = 0; x < w; x++) {
             a = Gray2Bin[pt_vertical  [counter]];
             b = Gray2Bin[pt_horizontal[counter]];
-            if(a*b){
-                c = a * asdasds + b;
-                pt_Map_h[ c ] = x;
-                pt_Map_v[ c ] = y;
-                counter1++;
+            if (a*b) {
+                c = (a*x_size+b) * 3;
+                pt_Map_hv[ c ] = x, c++;
+                pt_Map_hv[ c ] = y, c++;
+                pt_Map_hv[ c ] = 600;
+                right_point_counter++;
             }
             counter++;
         }
     }
-    printf("counter1++ %d \n", counter1);
+
+    printf("right_point_counter++ %d \n", right_point_counter);
 
 }
 
-void cordination_to_point(){
+void cordination_to_point( Mat &Map_hv, float *plane_vectors ){
+
+    //cv::Mat point(  cv::Size(3, 3),  CV_32FC3,  Scalar(   1,   1, 100  )  );
+    //line_plane_intersection( 
+    //    Scalar(  plane_vectors[0],  plane_vectors[1],  plane_vectors[2]  ),
+    //    Scalar(  plane_vectors[3],  plane_vectors[4],  plane_vectors[5]  ),
+    //    point,  3,  3
+    //);
+    line_plane_intersection( 
+        Scalar(  plane_vectors[0],  plane_vectors[1],  plane_vectors[2]  ),
+        Scalar(  plane_vectors[3],  plane_vectors[4],  plane_vectors[5]  ),
+        Map_hv,  1024,  1024
+    );
 
 }
 
@@ -518,7 +529,12 @@ void capture_plane     ( Mat &aafsa ){
 
 }
 
-void image_processing0(){
+//######################################################
+//#
+//######################################################
+
+
+void graycode_map( Mat &aafsa ){
 
     Mat black     (h, w, CV_16SC1);
     Mat white     (h, w, CV_16SC1);
@@ -528,8 +544,7 @@ void image_processing0(){
     Mat bit_v     (h, w, CV_16UC1);
     Mat bit_buffer(h, w, CV_16UC1);
 
-    Mat bit_hasdas   (1024, 1024, CV_16UC1);
-    Mat bit_vasdas   (1024, 1024, CV_16UC1);
+    Mat bit_hvsdas   (1024, 1024, CV_32FC3);
 
     capture_background(black,0);
     capture_background(white,1);
@@ -578,82 +593,83 @@ void image_processing0(){
         
     }
 
-    Mat ssbit_h = bit_h*(1<<6);
-    camera2(ssbit_h);
-    waitKey(6000);
+    //Mat ssbit_h = bit_h*(1<<6);
+    //camera2(ssbit_h);
+    //waitKey(6000);
 
-    Mat ssbit_v = bit_v*(1<<6);
-    camera2(ssbit_v);
-    waitKey(6000);
+    //Mat ssbit_v = bit_v*(1<<6);
+    //camera2(ssbit_v);
+    //waitKey(6000);
 
     //######################################################
     //#
     //######################################################
 
-    bit_to_cordination(  bit_h,bit_v,  bit_hasdas,bit_vasdas,  h,w,  1024,1024  );
+    bit_to_cordination(  bit_h,bit_v,  bit_hvsdas,  h,w,  1024,1024  );
 
-    bit_hasdas = bit_hasdas*100;
-    camera2(bit_hasdas);
-    waitKey(6000);
+    //bit_hasdas = bit_hasdas*100;
+    //camera2(bit_hasdas);
+    //waitKey(6000);
 
-    bit_vasdas = bit_vasdas*100;
-    camera2(bit_vasdas);
-    waitKey(6000);
+    //bit_vasdas = bit_vasdas*100;
+    //camera2(bit_vasdas);
+    //waitKey(6000);
 
 
-    //######################################################
-    //# 좌표를 3차원으로 바꾸고 
-    //######################################################
+    //    //######################################################
+    //    //# 좌표를 3차원으로 바꾸고 
+    //    //######################################################
 
     Mat adsadasdas   (1024, 1024, CV_32FC3);
-    
-    uint16_t * x = (uint16_t*) bit_hasdas.data;
-    uint16_t * y = (uint16_t*) bit_vasdas.data;
-    float    * w = (float   *) adsadasdas.data;
-    
-    uint64_t counter  = 0;
 
-    for (uint32_t y = 0; y < projector_map_shape_y; y++)
-    {
-        for (uint32_t x = 0; x < projector_map_shape_x; x++)
-        {
-            w[counter  ] = x;
-            w[counter+1] = y;
-            w[counter+2] = focus;
-            counter += 3;
-        }
-    }
+    //    uint16_t * x = (uint16_t*) bit_hasdas.data;
+    //    uint16_t * y = (uint16_t*) bit_vasdas.data;
+    //    float    * w = (float   *) adsadasdas.data;
+    //    
+    //    uint64_t counter  = 0;
+    //
+    //    for (uint32_t y = 0; y < projector_map_shape_y; y++)
+    //    {
+    //        for (uint32_t x = 0; x < projector_map_shape_x; x++)
+    //        {
+    //            w[counter  ] = x;
+    //            w[counter+1] = y;
+    //            w[counter+2] = focus;
+    //            counter += 3;
+    //        }
+    //    }
+
+    aafsa = bit_hvsdas;
     
-    adsadasdas = adsadasdas/600;
+    adsadasdas = bit_hvsdas/600;
     camera2(adsadasdas);
     waitKey(6000);
     
 }
-void image_processing1(){
+void image_to_planeaaaaa(float *plane_vectors){
 
+    //float plane_vectors[] = {0,0,0,0,0,0};
     Mat gray;
-    float plane_vectors[] = {0,0,0,0,0,0};
     capture_plane( gray );
     image_to_plane( gray, plane_vectors );
-    //cout << "nomal_vector" << endl << " " << color2[0] << color2[1] << color2[2] << endl << endl << endl;
 
     printf("%f, %f, %f,    %f, %f, %f \n\n",
-        plane_vectors[0], 
-        plane_vectors[1], 
-        plane_vectors[2],
-
-        plane_vectors[3], 
-        plane_vectors[4], 
-        plane_vectors[5]
+        plane_vectors[0], plane_vectors[1], plane_vectors[2],
+        plane_vectors[3], plane_vectors[4], plane_vectors[5]
     );
-    //cv::Mat point(  cv::Size(3, 3),  CV_32FC3,  Scalar(   1,   1, 100  )  );
-    //line_plane_intersection( 
-    //    Scalar(  0,  0.5,  0.5  ),  Scalar(  222,  222,  222  ), 
-    //    point,  3,  3
-    //);
-    
-    
+
 }
+void processing(){
+    
+    Mat gray;
+    float plane_vectors[] = {0,0,0,0,0,0};
+
+    graycode_map(gray);
+    image_to_planeaaaaa(plane_vectors);
+    cordination_to_point( gray, plane_vectors );
+    //calc_point_map();
+}
+
 
 void thread_camera(){
 
@@ -721,7 +737,7 @@ void thread_main  (){
         printf("aaaaaaaaaaaaaaaaaaa\n");
         
         //image_processing0();
-        image_processing1();
+        processing();
 
     }
    
@@ -735,6 +751,7 @@ void thread_main  (){
     ////######################################################
     
 }
+
 
 int main (int, char**) {   
 
