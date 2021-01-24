@@ -1,4 +1,4 @@
-
+#include <fstream>
 #include <iostream>  
 #include <string>
 #include <time.h>
@@ -67,7 +67,7 @@ Mat  projector_map_GRAY(  int h,  int w,  int stage,  int inv,  int direction  )
 Mat  projector_map_LAMP(  int h,  int w,  int inv  );
 
 void custom_op_sum(  Mat &in_3d,  int h,  int w  );
-void line_plane_intersection( Scalar N, Scalar T, Mat &p2,  int h,  int w );
+void line_plane_intersection( Scalar N, Scalar T,  Mat &p1,  Mat &p2,  int h,  int w );
 
 void processing( VideoCapture &cap );
 
@@ -267,10 +267,14 @@ void cordination_to_point( Mat &Map_hv, float *plane_vectors ){
     //    Scalar(  plane_vectors[3],  plane_vectors[4],  plane_vectors[5]  ),
     //    point,  3,  3
     //);
+    
+    cv::Mat p1(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(   0,   0,   0  )  );
+
     line_plane_intersection( 
         Scalar(  plane_vectors[0],  plane_vectors[1],  plane_vectors[2]  ),
         Scalar(  plane_vectors[3],  plane_vectors[4],  plane_vectors[5]  ),
-        Map_hv,  1024,  1024
+        p1, Map_hv,  
+        1024,  1024
     );
 
 }
@@ -356,15 +360,13 @@ void custom_op_sum(  Mat &in_3d,  int h,  int w  ){
 
     // 3차원을 sum 후 다시 같은 값으로 만들어줌
 
-    in_3d.convertTo( in_3d, CV_32FC3);
-
     float *  in_3d_pt = (float *) in_3d.data;
 
     float adf = 0;
 
-    uint32_t asd111 = 0;
-    uint32_t asd112 = 1;
-    uint32_t asd113 = 2;
+    uint64_t asd111 = 0;
+    uint64_t asd112 = 1;
+    uint64_t asd113 = 2;
 
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
@@ -372,49 +374,48 @@ void custom_op_sum(  Mat &in_3d,  int h,  int w  ){
             in_3d_pt[asd111] = adf ;
             in_3d_pt[asd112] = adf ;
             in_3d_pt[asd113] = adf ;
-            asd111+=3,  asd112+=3,  asd113+=3;
+            asd111 = asd111 + 3,  asd112 = asd112 + 3,  asd113 = asd113 + 3;
         }
     }
 
 }
 
-void line_plane_intersection( Scalar N, Scalar T,  Mat &p2,  int h,  int w ){
+void line_plane_intersection( Scalar N, Scalar T,  Mat &p1,  Mat &p2,  int h,  int w ){
 
-    //#직선의 방정식
-    //#P       #평면 위의 임의의 점 교차점
-    //#P1      #선이 지나는 이미 알고 있는 2개의 점을 각각 P1, P2
-    //#p2
-    //#U       #선에 대한 기울기 값
-    //#P=P1+U(P2-P1)
-
-    //####구하는 방법####
-    //# N*(P1+u(P2-P1))=N*P3
-    //# U = [N*(P3-P1)] / [N*(P2-P1)]
-    //# 직선의 방정식에 u를 집어넣는다.
-        
-        
-    //P1=np.array(point1)
-    //P2=np.array(point2)
-    //P3=np.array(plane_point )
-    //N =np.array(plane_vactor)
-    //U = (    sum(N * (P3-P1))    /    sum(N * (P2-P1))    )
-    //(P1+np.multiply(U,(P2-P1)))
+    //   직선의 방정식
+    //   P       #평면 위의 임의의 점 교차점
+    //   P1      #선이 지나는 이미 알고 있는 2개의 점을 각각 P1, P2
+    //   p2
+    //   U       #선에 대한 기울기 값
+    //   P=P1+U(P2-P1)
+    //  
+    //   ###구하는 방법####
+    //   N*(P1+u(P2-P1))=N*P3
+    //   U = [N*(P3-P1)] / [N*(P2-P1)]
+    //   직선의 방정식에 u를 집어넣는다.
+    //  P1 = np.array(point1)
+    //  P2 = np.array(point2)
+    //  P3 = np.array(plane_point )
+    //  N  = np.array(plane_vactor)
+    //  U  =  (    sum(N * (P3-P1))    /    sum(N * (P2-P1))    )
+    //  (P1+np.multiply(U,(P2-P1)))
     
-    cv::Mat nomal_vector(  cv::Size(3, 3),  CV_32FC3,  N  ); 
-    cv::Mat  translation(  cv::Size(3, 3),  CV_32FC3,  T  );
-    cv::Mat           p1(  cv::Size(3, 3),  CV_32FC3,  Scalar(   0,   0,   0  )  );
+    cv::Mat nomal_vector(  cv::Size(h, w),  CV_32FC3,  N                         ); 
+    cv::Mat  translation(  cv::Size(h, w),  CV_32FC3,  T                         );
     cv::Mat            U; 
     cv::Mat         sssU; 
-        
+
     //cout << "         p1" << endl <<  " "  <<          p1 << endl << endl;
     //cout << "         p2" << endl <<  " "  <<          p2 << endl << endl;
     //cout << "translation" << endl <<  " "  << translation << endl << endl;
 
-    U    = nomal_vector.mul(translation)  /  nomal_vector.mul(p2)  ;
+    U    = nomal_vector.mul(translation-p1)  /  nomal_vector.mul(p2-p1)  ;
+    custom_op_sum(  U,  h,  w  );
     //cout << "          U" << endl <<  " "  <<           U << endl << endl;
 
-    custom_op_sum(  U,  3,  3  );
-    sssU = U.mul(p2);
+    sssU = p1 + U.mul(p2);
+
+    p2   = sssU;
     //cout << "       sssU" << endl <<  " "  <<        sssU << endl << endl;
 
 }
@@ -530,6 +531,78 @@ void capture_plane     ( Mat &aafsa ){
 }
 
 //######################################################
+//# 파일 입출력
+//######################################################
+
+void aaaaaaa( Mat &qwerqer, int h, int w ){
+
+    //
+    char a0[] = "ply\n";
+    char a1[] = "format binary_little_endian 1.0\n";
+    char a2[] = "element vertex 500000          \n";
+    char a3[] = "property float x\n";
+    char a4[] = "property float y\n";
+    char a5[] = "property float z\n";
+    char a6[] = "end_header\n";
+
+    //
+    FILE *src;
+    size_t nRead;
+
+    // 헤더
+    src = fopen("32323.ply","wb");
+
+    if (src != NULL) {
+        printf("file open OK \n");
+        fwrite(a0,1, 4,src), fwrite(a1,1,32,src), fwrite(a2,1,32,src), fwrite(a3,1,17,src);
+        fwrite(a4,1,17,src), fwrite(a5,1,17,src), fwrite(a6,1,11,src);
+    }
+
+    // 데이터
+    float * qwerqerqwerqwer = (float*) qwerqer.data;
+
+    float buffer[3072] = {0};
+    float buffer_0 = 0;
+    float buffer_1 = 0;
+    float buffer_2 = 0;
+
+    uint64_t count        = 0;
+    uint64_t count_buffer = 0;
+    
+    for (uint32_t y = 0; y < h; y++) {
+        for (uint32_t x = 0; x < w; x++) {
+            buffer_0 = qwerqerqwerqwer[count  ];
+            buffer_1 = qwerqerqwerqwer[count+1];
+            buffer_2 = qwerqerqwerqwer[count+2];
+            count = count + 3;
+            if (buffer_0 * buffer_1 * buffer_2) {
+                buffer[count_buffer  ] = buffer_0;
+                buffer[count_buffer+1] = buffer_1;
+                buffer[count_buffer+2] = buffer_2;
+                count_buffer = count_buffer + 3;
+                if(count_buffer>3072) fwrite(buffer,sizeof(float),3072,src), count_buffer = 0;
+            }
+        }
+    }
+
+    if(count_buffer!=0) fwrite(buffer,sizeof(float),count_buffer,src), count_buffer = 0;
+    
+    fclose(src);
+
+    //src = fopen("32323.dfk","rb");
+    //printf("쓴걸 검위해 열었다. %d\n",src);
+    //if (src != NULL) {
+    //    while(!feof(src)) {
+    //        nRead=fread(buf,1,256,src);
+    //        printf("%s",buf);
+    //        printf("=========================%d\n",nRead);
+    //    }
+    //    fclose(src);
+    //}
+
+}
+
+//######################################################
 //#
 //######################################################
 
@@ -596,7 +669,6 @@ void graycode_map( Mat &aafsa ){
     //Mat ssbit_h = bit_h*(1<<6);
     //camera2(ssbit_h);
     //waitKey(6000);
-
     //Mat ssbit_v = bit_v*(1<<6);
     //camera2(ssbit_v);
     //waitKey(6000);
@@ -610,7 +682,6 @@ void graycode_map( Mat &aafsa ){
     //bit_hasdas = bit_hasdas*100;
     //camera2(bit_hasdas);
     //waitKey(6000);
-
     //bit_vasdas = bit_vasdas*100;
     //camera2(bit_vasdas);
     //waitKey(6000);
@@ -620,7 +691,7 @@ void graycode_map( Mat &aafsa ){
     //    //# 좌표를 3차원으로 바꾸고 
     //    //######################################################
 
-    Mat adsadasdas   (1024, 1024, CV_32FC3);
+    //Mat adsadasdas   (1024, 1024, CV_32FC3);
 
     //    uint16_t * x = (uint16_t*) bit_hasdas.data;
     //    uint16_t * y = (uint16_t*) bit_vasdas.data;
@@ -641,9 +712,9 @@ void graycode_map( Mat &aafsa ){
 
     aafsa = bit_hvsdas;
     
-    adsadasdas = bit_hvsdas/600;
-    camera2(adsadasdas);
-    waitKey(6000);
+    //adsadasdas = bit_hvsdas/600;
+    //camera2(adsadasdas);
+    //waitKey(6000);
     
 }
 void image_to_planeaaaaa(float *plane_vectors){
@@ -661,16 +732,28 @@ void image_to_planeaaaaa(float *plane_vectors){
 }
 void processing(){
     
+    //cv::Mat p1(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(   0,   0,   0  )  );
+    //cv::Mat p2(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(  10,  10,  10  )  );
+    //line_plane_intersection(  Scalar(0,0,1),Scalar(0,0,600),  p1,p2,  1024,1024  );
+    //cout << "line_plane_intersection : " << endl <<  " "  <<        p2 << endl << endl;
+    //aaaaaaa(p2,1024,1024);
+    
     Mat gray;
-    float plane_vectors[] = {0,0,0,0,0,0};
-
+    float plane_vectors[] = {    0, 0, 1.0,    0, 0, 600.0    };
+    //image_to_planeaaaaa(plane_vectors);
     graycode_map(gray);
-    image_to_planeaaaaa(plane_vectors);
-    cordination_to_point( gray, plane_vectors );
-    //calc_point_map();
+    //cordination_to_point( gray, plane_vectors );
+    printf("cordination_to_point finish \n");
+    gray = gray /100;
+    aaaaaaa(gray,1024,1024);
+    printf("owari \n");
+
 }
 
 
+void thread_camera_update(){
+
+}
 void thread_camera(){
 
     while(1){
@@ -679,6 +762,7 @@ void thread_camera(){
         //if(buffer_flag==0) capture(cap, buffer), buffer_flag = 1, buffer_counter++;
         //cout << "captured!\n"<<buffer_counter<<endl<<endl;
         //printf("bbbbbbbbbbbbbbb\n");
+        //break;
     }
 
 }
@@ -736,8 +820,9 @@ void thread_main  (){
 
         printf("aaaaaaaaaaaaaaaaaaa\n");
         
-        //image_processing0();
         processing();
+
+        break;
 
     }
    
