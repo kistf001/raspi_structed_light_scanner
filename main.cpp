@@ -5,6 +5,7 @@
 #include <vector>
 #include <thread>
 #include <cmath>
+#include <random>
 
 #include <unistd.h>
 
@@ -66,9 +67,6 @@ void cordination_to_point( Mat &Map_hv, float *plane_vectors, uint32_t h, uint32
 
 Mat  projector_map_GRAY(  int h,  int w,  int stage,  int inv,  int direction  );
 Mat  projector_map_LAMP(  int h,  int w,  int inv  );
-
-void custom_op_sum(  Mat &in_3d,  int h,  int w  );
-void line_plane_intersection( Scalar N, Scalar T,  Mat &p1,  Mat &p2,  int h,  int w );
 
 void processing( VideoCapture &cap );
 
@@ -241,8 +239,6 @@ void bit_to_cordination(
     uint64_t b = 0;
     uint64_t c = 0;
 
-    for (uint64_t aaaa = 0; aaaa < h*w*3; aaaa++) pt_Map_hv[ aaaa ] = 0;
-
     for (uint32_t y = 0; y < h; y++) {
         for (uint32_t x = 0; x < w; x++) {
             a = Gray2Bin[pt_vertical  [counter]];
@@ -264,21 +260,38 @@ void bit_to_cordination(
 
 void cordination_to_point( Mat &Map_hv, float *plane_vectors, uint32_t h, uint32_t w ){
 
-    //cv::Mat point(  cv::Size(3, 3),  CV_32FC3,  Scalar(   1,   1, 100  )  );
-    //line_plane_intersection( 
-    //    Scalar(  plane_vectors[0],  plane_vectors[1],  plane_vectors[2]  ),
-    //    Scalar(  plane_vectors[3],  plane_vectors[4],  plane_vectors[5]  ),
-    //    point,  3,  3
-    //);
+    int a = 0;
     
-    cv::Mat p1(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(   0,   0,   0  )  );
+    float * map = (float *) Map_hv.data;
+    float * p2  = (float *) Map_hv.data;
+    
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
 
-    line_plane_intersection( 
-        Scalar(  plane_vectors[0],  plane_vectors[1],  plane_vectors[2]  ),
-        Scalar(  plane_vectors[3],  plane_vectors[4],  plane_vectors[5]  ),
-        p1, Map_hv,  
-        h,  w
-    );
+            if (  p2[a]  *  p2[a+1]  *  p2[a+2]  ) {
+            
+                // U = ( N*(TRANSLATION-P1) ) / ( N*(P2-P1) )
+                float U1 = (plane_vectors[0]*plane_vectors[3]) / (plane_vectors[0]*p2[a  ]);
+                float U2 = (plane_vectors[1]*plane_vectors[4]) / (plane_vectors[1]*p2[a+1]);
+                float U3 = (plane_vectors[2]*plane_vectors[5]) / (plane_vectors[2]*p2[a+2]);
+
+                if (isnan(U1)) U1 = 0;
+                if (isnan(U2)) U2 = 0;
+                if (isnan(U3)) U3 = 0;
+
+                float U  = U1 + U2 + U3;
+        
+                // P = P1 + U * P2
+                map[a  ] = U * p2[a  ] ;
+                map[a+1] = U * p2[a+1] ;
+                map[a+2] = U * p2[a+2] ;
+
+            }
+    
+            a = a + 3;
+    
+        }
+    }
 
 }
 
@@ -359,96 +372,194 @@ Mat projector_map_LAMP(  int h,  int w,  int inv  ){
 //# operation function
 //######################################################
 
-void custom_op_sum(  Mat &in_3d,  int h,  int w  ){
+class mainq {
+private:
+    /* data */
+public:
+    mainq(/* args */);
+    ~mainq();
+};
+mainq::mainq(/* args */){
+}
+mainq::~mainq(){
+}
 
-    // 3차원을 sum 후 다시 같은 값으로 만들어줌
+void LSM( float *MAT_A, int a_y, int a_x, float *MAT_B, float *MAT_X ){
+//void LSM(  ){
 
-    float *  in_3d_pt = (float *) in_3d.data;
+    //float  MAT_A[15] = {  -1,1,2,  3,-1,1,  -1,3,4,  1,1,1,  1,1,1  };
+    //float  MAT_B[5]  = {   1,1,1,1,1  };
+    //int a_y=5, a_x=3;
+    //float *MAT_X = (float *)malloc( sizeof(float)*a_y*a_x );
+    //for ( int i=0; i<a_x;     i++ )    MAT_X[i]=0;
 
-    float adf = 0;
+    int dim=a_x;
 
-    uint64_t asd111 = 0;
-    uint64_t asd112 = 1;
-    uint64_t asd113 = 2;
+    float *eye   = (float *)malloc( sizeof(float)*a_x*a_x );
+    float *AAt   = (float *)malloc( sizeof(float)*a_x*a_x );
+    float *pinv  = (float *)malloc( sizeof(float)*a_y*a_x );
 
-    for (int y = 0; y < h; y++) {
-        for (int x = 0; x < w; x++) {
-            adf = in_3d_pt[asd111] + in_3d_pt[asd112] + in_3d_pt[asd113] ; 
-            in_3d_pt[asd111] = adf ;
-            in_3d_pt[asd112] = adf ;
-            in_3d_pt[asd113] = adf ;
-            asd111 = asd111 + 3,  asd112 = asd112 + 3,  asd113 = asd113 + 3;
+    for ( int i=0; i<a_y*a_x; i++ )     pinv[i]=0;
+    for ( int i=0; i<a_x*a_x; i++ )      AAt[i]=0;
+    for ( int i=0; i<a_x*a_x; i+=a_x+1 ) eye[i]=1;
+
+
+    /* ( At A ) */
+    for ( int i=0; i<a_x; ++i )
+        for ( int j=0; j<a_x; ++j )
+            for ( int k=0; k<a_y; ++k )
+                AAt[i*a_x+j]+=MAT_A[k*a_x+i]*MAT_A[k*a_x+j];
+    ////// DATA
+    ////for (int i = 0; i < a_x; ++i) {
+	////	for (int j = 0; j < a_x; ++j) cout << AAt[i*a_x+j] << " "; cout << "\n";
+	////}
+
+    
+    /* inv( At A )  gause jordan inverse */
+    for ( int uuuu=0; uuuu<dim; uuuu++ ) {
+        float buffer = AAt[uuuu*dim+uuuu];
+        for ( int j=0; j<dim; j++ ) {
+            AAt[uuuu*dim+j]/=buffer;
+            eye[uuuu*dim+j]/=buffer;
+        }
+        uint32_t xxx=uuuu;
+        for ( int s=1; s<dim; s++ ) {
+            ++xxx%=dim, buffer=AAt[xxx*dim+uuuu];
+            for ( int j=0; j<dim; j++ ) {
+                AAt[xxx*dim+j]-=AAt[uuuu*dim+j]*buffer;
+                eye[xxx*dim+j]-=eye[uuuu*dim+j]*buffer;
+            }
         }
     }
+    ////// DATA
+    ////for (int i = 0; i < a_x; ++i) {
+	////	for (int j = 0; j < a_x; ++j) cout << eye[i*3+j] << " "; cout << "\n";
+	////}
 
-}
-
-void line_plane_intersection(  Scalar N, Scalar T,  Mat &p1, Mat &p2,  int h, int w  ){
-
-    //   직선의 방정식
-    //   P       #평면 위의 임의의 점 교차점
-    //   P1      #선이 지나는 이미 알고 있는 2개의 점을 각각 P1, P2
-    //   p2
-    //   U       #선에 대한 기울기 값
-    //   P=P1+U(P2-P1)
-    //  
-    //   ###구하는 방법####
-    //   N*(P1+u(P2-P1))=N*P3
-    //   U = [N*(P3-P1)] / [N*(P2-P1)]
-    //   직선의 방정식에 u를 집어넣는다.
-    //  P1 = np.array(point1)
-    //  P2 = np.array(point2)
-    //  P3 = np.array(plane_point )
-    //  N  = np.array(plane_vactor)
-    //  U  =  (    sum(N * (P3-P1))    /    sum(N * (P2-P1))    )
-    //  (P1+np.multiply(U,(P2-P1)))
     
-    cv::Mat nomal_vector(  cv::Size(h, w),  CV_32FC3,  N                         ); 
-    cv::Mat  translation(  cv::Size(h, w),  CV_32FC3,  T                         );
-    cv::Mat            U; 
-    cv::Mat         sssU; 
+    /* inv( At A ) At */
+    for ( int i=0; i<a_x; i++ )
+        for ( int j=0; j<a_y; j++ )
+            for ( int k=0; k<a_x; k++ )
+                pinv[i*a_y+j]+=eye[i*a_x+k]*MAT_A[j*a_x+k] ;
+    ////// DATA
+    ////for (int i = 0; i < a_x; ++i) {
+	////	for (int j = 0; j < a_y; ++j) cout << pinv[i*a_y+j] << " "; cout << "\n";
+	////}
 
-    //cout << "         p1" << endl <<  " "  <<          p1 << endl << endl;
-    //cout << "         p2" << endl <<  " "  <<          p2 << endl << endl;
-    //cout << "translation" << endl <<  " "  << translation << endl << endl;
+    
+    /* ( inv( At A ) At ) B */
+    for ( int j=0; j<a_x; j++ )
+        for ( int k=0; k<a_y; k++ )
+            MAT_X[j]+=pinv[j*a_y+k]*MAT_B[k];
+    ////// DATA
+	////for (int j = 0; j < a_x; ++j) cout << MAT_X[j] << " "; cout << "\n";
 
-    U    = nomal_vector.mul(translation-p1)  /  nomal_vector.mul(p2-p1)  ;
-    custom_op_sum(  U,  h,  w  );
-    //cout << "          U" << endl <<  " "  <<           U << endl << endl;
 
-    sssU = p1 + U.mul(p2);
+    free(eye );
+    free(AAt );
+    free(pinv);
 
-    p2   = sssU;
-    //cout << "       sssU" << endl <<  " "  <<        sssU << endl << endl;
 
 }
 
-int  triangle_cheack(  float xyz1, float xyz2  ){
+int  is_triangle(  float *xyz1, float *xyz2, float *xyz3  ){
 
-    //    d1 = 10
-    //    d2 =  0.1
-    //
-    //    float l = x - y;
-    //    float m = y - z;
-    //    float n = z - x;
-    //
-    //    a = ( l * l ).sum()
-    //    b = ( m * m ).sum()
-    //    c = ( n * n ).sum()
-    //
-    //    if      (  0  ==  (  d1 > (a/b) > d2  )  ){
-    //        return 0;
-    //    } 
-    //    
-    //    else if (  0  ==  (  d1 > (b/c) > d2 )  ){
-    //        return 0;
-    //    }
-    //    
-    //    else if (  0  ==  (  d1 > (c/a) > d2 )  ){:
-    //        return 0;
-    //    }
+    if(  ( xyz1[0] * xyz1[1] ) == 0  ) return 0;
+    if(  ( xyz2[0] * xyz2[1] ) == 0  ) return 0;
+
+    float d1 = 10.0 ;
+    float d2 =  0.1 ;
+
+    float l[2];
+    float m[2];
+    float n[2];
+
+    l[0] = xyz1[0] - xyz2[0];
+    l[1] = xyz1[1] - xyz2[1];
+    
+    m[0] = xyz2[0] - xyz3[0];
+    m[1] = xyz2[1] - xyz3[1];
+    
+    n[0] = xyz3[0] - xyz1[0];
+    n[1] = xyz3[1] - xyz1[1];
+    
+    float a = ( l[0] * l[0] ) + ( l[1] * l[1] ) ;
+    float b = ( n[0] * n[0] ) + ( n[1] * n[1] ) ;
+    float c = ( m[0] * m[0] ) + ( m[1] * n[1] ) ;
+    
+    if (  ( d1 > (a/b) > d2 ) == 0  ) return 0;
+    if (  ( d1 > (b/c) > d2 ) == 0  ) return 0;
+    if (  ( d1 > (c/a) > d2 ) == 0  ) return 0;
         
     return 1;
+
+}
+
+void ransac(Mat &aafsa){
+
+    // 시드값을 얻기 위한 random_device 생성.
+    std::random_device rd;
+
+    // random_device 를 통해 난수 생성 엔진을 초기화 한다.
+    std::mt19937 gen(rd());
+
+    // 0 부터 99 까지 균등하게 나타나는 난수열을 생성하기 위해 균등 분포 정의.
+    std::uniform_int_distribution<int> dis_x(0, 1023);
+    std::uniform_int_distribution<int> dis_y(0, 1023);
+
+    int aaaeqewr = 0;
+    int counter = 0;
+
+    float position_XY[32][3][3];
+    int   position_XY_buffer[3][2];
+
+    while(1) {
+
+        position_XY_buffer[0][0] = dis_x(gen);
+        position_XY_buffer[0][1] = dis_y(gen);
+        position_XY_buffer[1][0] = dis_x(gen);
+        position_XY_buffer[1][1] = dis_y(gen);
+        position_XY_buffer[2][0] = dis_x(gen);
+        position_XY_buffer[2][1] = dis_y(gen);
+        
+        float *ptr_pos1 = (float*)aafsa.data;
+        float *ptr_pos2 = (float*)aafsa.data;
+        float *ptr_pos3 = (float*)aafsa.data;
+
+        ptr_pos1 = &ptr_pos1[(((position_XY_buffer[0][1]*1024)+position_XY_buffer[0][0])*3)];
+        ptr_pos2 = &ptr_pos2[(((position_XY_buffer[1][1]*1024)+position_XY_buffer[1][0])*3)];
+        ptr_pos3 = &ptr_pos3[(((position_XY_buffer[2][1]*1024)+position_XY_buffer[2][0])*3)];
+
+        printf("%d  \n",counter);
+
+        counter++;
+
+        if (  is_triangle(  ptr_pos1,  ptr_pos2,  ptr_pos3  )  )
+            
+            position_XY[aaaeqewr][0][0] = position_XY_buffer[0][0],
+            position_XY[aaaeqewr][0][1] = position_XY_buffer[0][1],
+            position_XY[aaaeqewr][0][2] = 1,
+
+            position_XY[aaaeqewr][1][0] = position_XY_buffer[1][0],
+            position_XY[aaaeqewr][1][1] = position_XY_buffer[1][1],
+            position_XY[aaaeqewr][1][2] = 1,
+            
+            position_XY[aaaeqewr][2][0] = position_XY_buffer[2][0],
+            position_XY[aaaeqewr][2][1] = position_XY_buffer[2][1],
+            position_XY[aaaeqewr][2][2] = 1,
+            
+            aaaeqewr++;
+
+        if (  aaaeqewr > 32  ) break;
+
+    }
+
+    for ( int qq=0; qq<32; qq++ ) {
+
+        LSM( float *MAT_A, int a_y, int a_x, float *MAT_B, float *MAT_X ) ;
+        
+    }
 
 }
 
@@ -638,7 +749,6 @@ void aaaaaaa( Mat &qwerqer, int h, int w ){
 //#
 //######################################################
 
-
 void graycode_map(  Mat &aafsa  ){
 
     float plane_vectors[] = {    0, 0, 1.0,    0, 0, 600.0    };
@@ -659,6 +769,8 @@ void graycode_map(  Mat &aafsa  ){
     Mat bit_buffer(h, w, CV_16UC1);
 
     Mat bit_hvsdas   (1024, 1024, CV_32FC3);
+
+    bit_hvsdas = 0;
 
     capture_background(black,0);
     capture_background(white,1);
@@ -717,20 +829,22 @@ void graycode_map(  Mat &aafsa  ){
 
     aafsa = bit_hvsdas;
 
+    ransac(aafsa);
+
     cordination_to_point(  aafsa,  plane_vectors,  1024,1024  );
     
 }
 
-void triangulation(  Mat &p1, Mat &p2,  Mat &postion,  float focus,  int h, int w  ){
+void triangulation(  Mat &_p1, Mat &_p2,  Mat &postion,  float focus,  int h, int w  ){
+
+    int a = 0;
 
     float * image_map    = (float *) postion.data;
     float * map          = (float *) postion.data;
-    float * p1           = (float *)      p1.data;
-    float * p2           = (float *)      p2.data;
-    int a = 0;
-    float theta = 0;
-    float rad   = 0;
-    float sin, cos;
+    
+    float * p1           = (float *)     _p1.data;
+    float * p2           = (float *)     _p2.data;
+    
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
             
@@ -739,17 +853,14 @@ void triangulation(  Mat &p1, Mat &p2,  Mat &postion,  float focus,  int h, int 
             if (  image_map[a]  *  image_map[a+1]  *  image_map[a+2]  ) {
 
                 // theta 구하기
-                theta = image_map[a] / focus;
+                float theta = image_map[a] / focus;
 
                 // rad 구하기
-                rad = atan(theta);
-
-                // sin, cos 구하기
-                sin = sin(rad), cos = cos(rad);
+                float rad = atan(theta);
 
                 // 회전변환
-                float x = (1*cos); //- (0*cos);
-                float y = (1*sin); //+ (0*sin);
+                float x = (1*cos(rad)); //- (0*cos);
+                float y = (1*sin(rad)); //+ (0*sin);
 
                 float w = sqrt(x*x) + sqrt(y*y);
 
@@ -790,32 +901,25 @@ void triangulation(  Mat &p1, Mat &p2,  Mat &postion,  float focus,  int h, int 
     //
     //    adadsdas = np.sqrt(xxxxxxxx*xxxxxxxx) + np.sqrt(yyyyyyyy*yyyyyyyy)
 
-
-
 }
 
 void processing(){
     
     //cv::Mat p1(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(   0,   0,   0  )  );
     //cv::Mat p2(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(  10,  10,  10  )  );
-    //line_plane_intersection(  Scalar(0,0,1),Scalar(0,0,600),  p1,p2,  1024,1024  );
-    //cout << "line_plane_intersection : " << endl <<  " "  <<        p2 << endl << endl;
-    //aaaaaaa(p2,1024,1024);
-    //
     //float plane_vectors[] = {    0, 0, 1.0,    0, 0, 600.0    };
-    //image_to_planeaaaaa(plane_vectors);
     //cordination_to_point(  gray,  plane_vectors,  1024,1024  );
     
-    //Mat gray;
-    Mat gray;
-    //graycode_map(gray);
-    graycode_map(gray);
+    //Mat gray0;
+    Mat gray1;
+    //graycode_map(gray0);
+    graycode_map(gray1);
 
     printf("cordination_to_point finish \n");
-    
-    gray = gray / 100;
-    aaaaaaa(gray,1024,1024);
-    printf("owari \n");
+    //
+    //gray1 = gray1 / 100;
+    //aaaaaaa(gray1,projector_map_shape_y,projector_map_shape_x);
+    //printf("owari \n");
 
 }
 
