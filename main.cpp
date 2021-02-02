@@ -372,20 +372,8 @@ Mat projector_map_LAMP(  int h,  int w,  int inv  ){
 //# operation function
 //######################################################
 
-class mainq {
-private:
-    /* data */
-public:
-    mainq(/* args */);
-    ~mainq();
-};
-mainq::mainq(/* args */){
-}
-mainq::~mainq(){
-}
+void LSM(  float *MAT_A,  int a_y, int a_x,  float *MAT_B,  float *MAT_X  ){
 
-void LSM( float *MAT_A, int a_y, int a_x, float *MAT_B, float *MAT_X ){
-//void LSM(  ){
 
     //float  MAT_A[15] = {  -1,1,2,  3,-1,1,  -1,3,4,  1,1,1,  1,1,1  };
     //float  MAT_B[5]  = {   1,1,1,1,1  };
@@ -393,15 +381,16 @@ void LSM( float *MAT_A, int a_y, int a_x, float *MAT_B, float *MAT_X ){
     //float *MAT_X = (float *)malloc( sizeof(float)*a_y*a_x );
     //for ( int i=0; i<a_x;     i++ )    MAT_X[i]=0;
 
-    int dim=a_x;
 
-    float *eye   = (float *)malloc( sizeof(float)*a_x*a_x );
-    float *AAt   = (float *)malloc( sizeof(float)*a_x*a_x );
-    float *pinv  = (float *)malloc( sizeof(float)*a_y*a_x );
+    float *eye   = (float *)malloc( 4*a_x*a_x );
+    float *AAt   = (float *)malloc( 4*a_x*a_x );
+    float *pinv  = (float *)malloc( 4*a_y*a_x );
 
-    for ( int i=0; i<a_y*a_x; i++ )     pinv[i]=0;
-    for ( int i=0; i<a_x*a_x; i++ )      AAt[i]=0;
-    for ( int i=0; i<a_x*a_x; i+=a_x+1 ) eye[i]=1;
+
+    for (  int i=0;  i<a_y*a_x;  i++  )     pinv[i]=0;
+    for (  int i=0;  i<a_x*a_x;  i++  )      eye[i]=0, AAt[i]=0;
+    for (  int i=0;  i<a_x*a_x;  i+=a_x+1  ) eye[i]=1;
+    for (  int i=0;  i<a_x;      i++  )    MAT_X[i]=0;
 
 
     /* ( At A ) */
@@ -409,32 +398,32 @@ void LSM( float *MAT_A, int a_y, int a_x, float *MAT_B, float *MAT_X ){
         for ( int j=0; j<a_x; ++j )
             for ( int k=0; k<a_y; ++k )
                 AAt[i*a_x+j]+=MAT_A[k*a_x+i]*MAT_A[k*a_x+j];
-    ////// DATA
-    ////for (int i = 0; i < a_x; ++i) {
-	////	for (int j = 0; j < a_x; ++j) cout << AAt[i*a_x+j] << " "; cout << "\n";
-	////}
+    //// DATA
+    //for (int i = 0; i < a_x; ++i) {
+	//	for (int j = 0; j < a_x; ++j) cout << AAt[i*a_x+j] << " "; cout << "\n";
+	//}
 
     
     /* inv( At A )  gause jordan inverse */
-    for ( int uuuu=0; uuuu<dim; uuuu++ ) {
-        float buffer = AAt[uuuu*dim+uuuu];
-        for ( int j=0; j<dim; j++ ) {
-            AAt[uuuu*dim+j]/=buffer;
-            eye[uuuu*dim+j]/=buffer;
+    for ( int uuuu=0; uuuu<a_x; uuuu++ ) {
+        float buffer = AAt[uuuu*a_x+uuuu];
+        for ( int j=0; j<a_x; j++ ) {
+            AAt[uuuu*a_x+j]/=buffer;
+            eye[uuuu*a_x+j]/=buffer;
         }
         uint32_t xxx=uuuu;
-        for ( int s=1; s<dim; s++ ) {
-            ++xxx%=dim, buffer=AAt[xxx*dim+uuuu];
-            for ( int j=0; j<dim; j++ ) {
-                AAt[xxx*dim+j]-=AAt[uuuu*dim+j]*buffer;
-                eye[xxx*dim+j]-=eye[uuuu*dim+j]*buffer;
+        for ( int s=1; s<a_x; s++ ) {
+            ++xxx%=a_x, buffer=AAt[xxx*a_x+uuuu];
+            for ( int j=0; j<a_x; j++ ) {
+                AAt[xxx*a_x+j]-=AAt[uuuu*a_x+j]*buffer;
+                eye[xxx*a_x+j]-=eye[uuuu*a_x+j]*buffer;
             }
         }
     }
-    ////// DATA
-    ////for (int i = 0; i < a_x; ++i) {
-	////	for (int j = 0; j < a_x; ++j) cout << eye[i*3+j] << " "; cout << "\n";
-	////}
+    //// DATA
+    //for (int i = 0; i < a_x; ++i) {
+	//	for (int j = 0; j < a_x; ++j) cout << eye[i*3+j] << " "; cout << "\n";
+	//}
 
     
     /* inv( At A ) At */
@@ -442,51 +431,42 @@ void LSM( float *MAT_A, int a_y, int a_x, float *MAT_B, float *MAT_X ){
         for ( int j=0; j<a_y; j++ )
             for ( int k=0; k<a_x; k++ )
                 pinv[i*a_y+j]+=eye[i*a_x+k]*MAT_A[j*a_x+k] ;
-    ////// DATA
-    ////for (int i = 0; i < a_x; ++i) {
-	////	for (int j = 0; j < a_y; ++j) cout << pinv[i*a_y+j] << " "; cout << "\n";
-	////}
+    //// DATA
+    //for (int i = 0; i < a_x; ++i) {
+	//	for (int j = 0; j < a_y; ++j) cout << pinv[i*a_y+j] << " "; cout << "\n";
+	//}
 
     
     /* ( inv( At A ) At ) B */
     for ( int j=0; j<a_x; j++ )
         for ( int k=0; k<a_y; k++ )
             MAT_X[j]+=pinv[j*a_y+k]*MAT_B[k];
-    ////// DATA
-	////for (int j = 0; j < a_x; ++j) cout << MAT_X[j] << " "; cout << "\n";
+    //// DATA
+	//for (int j = 0; j < a_x; ++j) cout << MAT_X[j] << " "; cout << "\n";
 
 
-    free(eye );
-    free(AAt );
-    free(pinv);
+    free(eye), free(AAt), free(pinv);
 
 
 }
 
 int  is_triangle(  float *xyz1, float *xyz2, float *xyz3  ){
 
-    if(  ( xyz1[0] * xyz1[1] ) == 0  ) return 0;
-    if(  ( xyz2[0] * xyz2[1] ) == 0  ) return 0;
+    if(  ( xyz1[0] * xyz1[1] * xyz1[2] ) == 0  ) return 0;
+    if(  ( xyz2[0] * xyz2[1] * xyz2[2] ) == 0  ) return 0;
+    if(  ( xyz3[0] * xyz3[1] * xyz3[2] ) == 0  ) return 0;
 
-    float d1 = 10.0 ;
-    float d2 =  0.1 ;
+    float d1=10.0, d2=0.1;
 
-    float l[2];
-    float m[2];
-    float n[2];
+    float l[2], m[2], n[2];
 
-    l[0] = xyz1[0] - xyz2[0];
-    l[1] = xyz1[1] - xyz2[1];
-    
-    m[0] = xyz2[0] - xyz3[0];
-    m[1] = xyz2[1] - xyz3[1];
-    
-    n[0] = xyz3[0] - xyz1[0];
-    n[1] = xyz3[1] - xyz1[1];
-    
+    l[0] = xyz1[0] - xyz2[0], l[1] = xyz1[1] - xyz2[1];
+    m[0] = xyz2[0] - xyz3[0], m[1] = xyz2[1] - xyz3[1];
+    n[0] = xyz3[0] - xyz1[0], n[1] = xyz3[1] - xyz1[1];
+
     float a = ( l[0] * l[0] ) + ( l[1] * l[1] ) ;
     float b = ( n[0] * n[0] ) + ( n[1] * n[1] ) ;
-    float c = ( m[0] * m[0] ) + ( m[1] * n[1] ) ;
+    float c = ( m[0] * m[0] ) + ( m[1] * m[1] ) ;
     
     if (  ( d1 > (a/b) > d2 ) == 0  ) return 0;
     if (  ( d1 > (b/c) > d2 ) == 0  ) return 0;
@@ -496,7 +476,49 @@ int  is_triangle(  float *xyz1, float *xyz2, float *xyz3  ){
 
 }
 
+//######################################################
+//# filter
+//######################################################
+
+void picked_pointer_addr_to_LSM( float *XY, float *mat_data, float *X ){
+
+    LSM( XY, 3, 3, mat_data, X ) ;
+    
+}
+
+void right_point( Mat &image, float &weight, float &qqqq ){
+
+    float *aaaaa   = (float *)malloc( 4 );
+    float *bbbbb   = (float *)malloc( 4 );
+
+    int point_num = 0;
+
+    float *ptr_pos1 = (float*)image.data;
+
+    for ( int a=0; a<1024; a++ ) {
+        for ( int b=0; b<1024; b++ ) {
+            if ( ptr_pos1[(a*1024+b)*3]*ptr_pos1[(a*1024+b)*3+1] ) {
+                float mean = ptr_pos1[(a*1024+b)*3]-((b*weight[0]+a*weight[1])+weight[2]);
+                if ( (1>mean)>-1 ) {
+                    realloc( aaaaa,4*(point_num+1)*3 );
+                    realloc( bbbbb,4*(point_num+1) );
+                    aaaaa[point_num]=b,  aaaaa[point_num+1]=a,  aaaaa[point_num+2]=1;
+                    bbbbb[point_num]=b,  bbbbb[point_num+1]=a,  bbbbb[point_num+2]=1;
+                    point_num++;
+                }
+            }
+        }
+    }
+
+    picked_pointer_addr_to_LSM( aaaaa, bbbbb, qqqq );
+
+    free(aaaaa), free(bbbbb);
+
+}
+
 void ransac(Mat &aafsa){
+
+    #define sample_num 32
 
     // 시드값을 얻기 위한 random_device 생성.
     std::random_device rd;
@@ -509,57 +531,94 @@ void ransac(Mat &aafsa){
     std::uniform_int_distribution<int> dis_y(0, 1023);
 
     int aaaeqewr = 0;
-    int counter = 0;
+    int counter_random = 0;
 
-    float position_XY[32][3][3];
-    int   position_XY_buffer[3][2];
+    int pos_XY_buffer[3][2];
+    float pos_XY [sample_num][3][3];
+    float pos_Z  [sample_num][3];
 
-    while(1) {
+    while (1) {
 
-        position_XY_buffer[0][0] = dis_x(gen);
-        position_XY_buffer[0][1] = dis_y(gen);
-        position_XY_buffer[1][0] = dis_x(gen);
-        position_XY_buffer[1][1] = dis_y(gen);
-        position_XY_buffer[2][0] = dis_x(gen);
-        position_XY_buffer[2][1] = dis_y(gen);
+        pos_XY_buffer[0][0] = dis_x(gen), pos_XY_buffer[0][1] = dis_y(gen);
+        pos_XY_buffer[1][0] = dis_x(gen), pos_XY_buffer[1][1] = dis_y(gen);
+        pos_XY_buffer[2][0] = dis_x(gen), pos_XY_buffer[2][1] = dis_y(gen);
         
         float *ptr_pos1 = (float*)aafsa.data;
         float *ptr_pos2 = (float*)aafsa.data;
         float *ptr_pos3 = (float*)aafsa.data;
 
-        ptr_pos1 = &ptr_pos1[(((position_XY_buffer[0][1]*1024)+position_XY_buffer[0][0])*3)];
-        ptr_pos2 = &ptr_pos2[(((position_XY_buffer[1][1]*1024)+position_XY_buffer[1][0])*3)];
-        ptr_pos3 = &ptr_pos3[(((position_XY_buffer[2][1]*1024)+position_XY_buffer[2][0])*3)];
+        ptr_pos1 = &ptr_pos1[(((pos_XY_buffer[0][1]*1024)+pos_XY_buffer[0][0])*3)];
+        ptr_pos2 = &ptr_pos2[(((pos_XY_buffer[1][1]*1024)+pos_XY_buffer[1][0])*3)];
+        ptr_pos3 = &ptr_pos3[(((pos_XY_buffer[2][1]*1024)+pos_XY_buffer[2][0])*3)];
 
-        printf("%d  \n",counter);
+        printf("%d  \n",counter_random), counter_random++;
 
-        counter++;
-
-        if (  is_triangle(  ptr_pos1,  ptr_pos2,  ptr_pos3  )  )
+        if (  is_triangle(  ptr_pos1,  ptr_pos2,  ptr_pos3  )  ) {
             
-            position_XY[aaaeqewr][0][0] = position_XY_buffer[0][0],
-            position_XY[aaaeqewr][0][1] = position_XY_buffer[0][1],
-            position_XY[aaaeqewr][0][2] = 1,
+            pos_XY[aaaeqewr][0][0] = pos_XY_buffer[0][0],
+            pos_XY[aaaeqewr][0][1] = pos_XY_buffer[0][1],
+            pos_XY[aaaeqewr][0][2] = 1,
 
-            position_XY[aaaeqewr][1][0] = position_XY_buffer[1][0],
-            position_XY[aaaeqewr][1][1] = position_XY_buffer[1][1],
-            position_XY[aaaeqewr][1][2] = 1,
-            
-            position_XY[aaaeqewr][2][0] = position_XY_buffer[2][0],
-            position_XY[aaaeqewr][2][1] = position_XY_buffer[2][1],
-            position_XY[aaaeqewr][2][2] = 1,
+            pos_XY[aaaeqewr][1][0] = pos_XY_buffer[1][0],
+            pos_XY[aaaeqewr][1][1] = pos_XY_buffer[1][1],
+            pos_XY[aaaeqewr][1][2] = 1,
+
+            pos_XY[aaaeqewr][2][0] = pos_XY_buffer[2][0],
+            pos_XY[aaaeqewr][2][1] = pos_XY_buffer[2][1],
+            pos_XY[aaaeqewr][2][2] = 1,
+        
+            ptr_pos1 = (float*)aafsa.data;
+            ptr_pos2 = (float*)aafsa.data;
+            ptr_pos3 = (float*)aafsa.data;
+
+            pos_Z[aaaeqewr][0] = ptr_pos1[(((pos_XY_buffer[0][1]*1024)+pos_XY_buffer[0][0])*3)];
+            pos_Z[aaaeqewr][1] = ptr_pos2[(((pos_XY_buffer[1][1]*1024)+pos_XY_buffer[1][0])*3)];
+            pos_Z[aaaeqewr][2] = ptr_pos3[(((pos_XY_buffer[2][1]*1024)+pos_XY_buffer[2][0])*3)];
             
             aaaeqewr++;
-
-        if (  aaaeqewr > 32  ) break;
-
-    }
-
-    for ( int qq=0; qq<32; qq++ ) {
-
-        LSM( float *MAT_A, int a_y, int a_x, float *MAT_B, float *MAT_X ) ;
         
+        }
+        
+        if (  aaaeqewr >= sample_num  ) break;
+
     }
+
+    int counter_correct_point_most = 0;
+    int counter_correct_point      = 0;
+    int counter_ssss               = 0;
+
+    float SLMA[3], SLMA_prev[3];
+
+    for ( int qq=0; qq<sample_num; qq++ ) {
+
+        picked_pointer_addr_to_LSM( &pos_XY[qq][0][0], &pos_Z[qq][0], &SLMA[0] );
+
+        // 받은 이미지의 X 값을 훑으면서 일정범위 사이에 점이 있으면 카운트를 셈
+        counter_correct_point = 0, counter_ssss = 0;
+        float *ptr_pos1 = (float*)aafsa.data;
+        for ( int a=0; a<1024; a++ ) {
+            for ( int b=0; b<1024; b++ ) {
+                if ( ptr_pos1[(a*1024+b)*3]*ptr_pos1[(a*1024+b)*3+1] ) {
+                    float mean = ptr_pos1[(a*1024+b)*3]-((b*SLMA[0]+a*SLMA[1])+SLMA[2]);
+                    if ( (1>mean)>-1 ) counter_correct_point++;
+                }
+                counter_ssss++;
+            }
+        }
+
+        // 카운트가 지금까지 세었던 것 중에 가장 높으면 업데이트함
+        if ( counter_correct_point>counter_correct_point_most ) {
+            counter_correct_point_most = counter_correct_point;
+            SLMA_prev[0]=SLMA[0],  SLMA_prev[1]=SLMA[1],  SLMA_prev[2]=SLMA[2];
+        }
+
+        printf(  "%d %d ==> %f,%f,%f \n",  counter_correct_point,  qq,  SLMA[0], SLMA[1], SLMA[2]  );
+
+    }
+    
+    float WWWW[3];
+
+    right_point( aafsa, SLMA_prev, WWWW );
 
 }
 
