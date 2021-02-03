@@ -235,9 +235,7 @@ void bit_to_cordination(
     uint32_t counter             = 0;
     uint32_t x_size              = w_im;
 
-    uint64_t a = 0;
-    uint64_t b = 0;
-    uint64_t c = 0;
+    uint64_t a=0, b=0, c=0;
 
     for (uint32_t y = 0; y < h; y++) {
         for (uint32_t x = 0; x < w; x++) {
@@ -245,9 +243,9 @@ void bit_to_cordination(
             b = Gray2Bin[pt_horizontal[counter]];
             if (a*b) {
                 c = (a*x_size+b) * 3;
-                pt_Map_hv[ c ] = x, c++;
-                pt_Map_hv[ c ] = y, c++;
-                pt_Map_hv[ c ] = focus;
+                pt_Map_hv[ c   ] = x;
+                pt_Map_hv[ c+1 ] = y;
+                pt_Map_hv[ c+2 ] = focus;
                 right_point_counter++;
             }
             counter++;
@@ -480,63 +478,93 @@ int  is_triangle(  float *xyz1, float *xyz2, float *xyz3  ){
 //# filter
 //######################################################
 
+float dfdfdfqqq = 0.01;
+
 void picked_pointer_addr_to_LSM( float *XY, float *mat_data, float *X ){
 
     LSM( XY, 3, 3, mat_data, X ) ;
     
 }
+void picked_pointer_addr_to_LSM11( float *XY, int y, int x, float *mat_data, float *X ){
 
-void right_point( Mat &image, float &weight, float &qqqq ){
+    LSM( XY, y, x, mat_data, X ) ;
+    
+}
 
-    float *aaaaa   = (float *)malloc( 4 );
-    float *bbbbb   = (float *)malloc( 4 );
+void right_point( Mat &image, float *weight, float *weight_y ){
 
-    int point_num = 0;
+    float *aaaaa_x = (float *)malloc( 4*1024*1024*3 );
+    float *aaaaa_y = (float *)malloc( 4*1024*1024*3 );
+    float *bbbbb_x = (float *)malloc( 4*1024*1024   );
+    float *bbbbb_y = (float *)malloc( 4*1024*1024   );
+
+    int point_num_x = 0;
+    int point_num_y = 0;
 
     float *ptr_pos1 = (float*)image.data;
 
     for ( int a=0; a<1024; a++ ) {
         for ( int b=0; b<1024; b++ ) {
-            if ( ptr_pos1[(a*1024+b)*3]*ptr_pos1[(a*1024+b)*3+1] ) {
+            if ( ptr_pos1[(a*1024+b)*3]*ptr_pos1[((a*1024+b)*3)+1] ) {
                 float mean = ptr_pos1[(a*1024+b)*3]-((b*weight[0]+a*weight[1])+weight[2]);
-                if ( (1>mean)>-1 ) {
-                    realloc( aaaaa,4*(point_num+1)*3 );
-                    realloc( bbbbb,4*(point_num+1) );
-                    aaaaa[point_num]=b,  aaaaa[point_num+1]=a,  aaaaa[point_num+2]=1;
-                    bbbbb[point_num]=b,  bbbbb[point_num+1]=a,  bbbbb[point_num+2]=1;
-                    point_num++;
+                if ( (dfdfdfqqq>mean)||(mean>-dfdfdfqqq) ) {
+                    aaaaa_x[point_num_x*3  ]=(float)b;
+                    aaaaa_x[point_num_x*3+1]=(float)a;
+                    aaaaa_x[point_num_x*3+2]=(float)1;
+                    aaaaa_y[point_num_y*3  ]=(float)b;
+                    aaaaa_y[point_num_y*3+1]=(float)a;
+                    aaaaa_y[point_num_y*3+2]=(float)1;
+                    bbbbb_x[point_num_x]=ptr_pos1[(a*1024+b)*3];
+                    bbbbb_y[point_num_y]=ptr_pos1[(a*1024+b)*3];
+                    point_num_x++;
+                    point_num_y++;
                 }
             }
         }
     }
 
-    picked_pointer_addr_to_LSM( aaaaa, bbbbb, qqqq );
+    printf("%d\n",point_num_x);
+    
+    float qqqq_x[3], qqqq_y[3];
 
-    free(aaaaa), free(bbbbb);
+    picked_pointer_addr_to_LSM11( aaaaa_x, point_num_x, 3, bbbbb_x, &qqqq_x[0] );
+    picked_pointer_addr_to_LSM11( aaaaa_y, point_num_y, 3, bbbbb_y, &qqqq_y[0] );
+
+    for ( int a=0; a<1024; a++ ) {
+        for ( int b=0; b<1024; b++ ) {
+            ptr_pos1[((a*1024+b)*3)  ] = (qqqq_x[0]*b)+(qqqq_x[1]*a)+qqqq_x[2];
+            ptr_pos1[((a*1024+b)*3)+1] = (qqqq_y[0]*b)+(qqqq_y[1]*a)+qqqq_y[2];
+        }
+    }
+
+    printf(  "==> %f,%f,%f \n",  qqqq_x[0], qqqq_x[1], qqqq_x[2]  );
+    printf(  "==> %f,%f,%f \n",  qqqq_y[0], qqqq_y[1], qqqq_y[2]  );
+
+    free(aaaaa_x), free(bbbbb_x), free(aaaaa_y), free(bbbbb_y);
 
 }
 
 void ransac(Mat &aafsa){
 
-    #define sample_num 32
+    #define sample_num 64
 
     // 시드값을 얻기 위한 random_device 생성.
     std::random_device rd;
 
-    // random_device 를 통해 난수 생성 엔진을 초기화 한다.
     std::mt19937 gen(rd());
 
-    // 0 부터 99 까지 균등하게 나타나는 난수열을 생성하기 위해 균등 분포 정의.
     std::uniform_int_distribution<int> dis_x(0, 1023);
     std::uniform_int_distribution<int> dis_y(0, 1023);
 
     int aaaeqewr = 0;
     int counter_random = 0;
 
-    int pos_XY_buffer[3][2];
-    float pos_XY [sample_num][3][3];
-    float pos_Z  [sample_num][3];
+    int   pos_XY_buffer[3][2];
+    float pos_XY[sample_num][3][3];
+    float pos_Z_X[sample_num][3];
+    float pos_Z_Y[sample_num][3];
 
+    // 무작위로 삼각형들을 뽑아냄
     while (1) {
 
         pos_XY_buffer[0][0] = dis_x(gen), pos_XY_buffer[0][1] = dis_y(gen);
@@ -550,8 +578,6 @@ void ransac(Mat &aafsa){
         ptr_pos1 = &ptr_pos1[(((pos_XY_buffer[0][1]*1024)+pos_XY_buffer[0][0])*3)];
         ptr_pos2 = &ptr_pos2[(((pos_XY_buffer[1][1]*1024)+pos_XY_buffer[1][0])*3)];
         ptr_pos3 = &ptr_pos3[(((pos_XY_buffer[2][1]*1024)+pos_XY_buffer[2][0])*3)];
-
-        printf("%d  \n",counter_random), counter_random++;
 
         if (  is_triangle(  ptr_pos1,  ptr_pos2,  ptr_pos3  )  ) {
             
@@ -571,9 +597,13 @@ void ransac(Mat &aafsa){
             ptr_pos2 = (float*)aafsa.data;
             ptr_pos3 = (float*)aafsa.data;
 
-            pos_Z[aaaeqewr][0] = ptr_pos1[(((pos_XY_buffer[0][1]*1024)+pos_XY_buffer[0][0])*3)];
-            pos_Z[aaaeqewr][1] = ptr_pos2[(((pos_XY_buffer[1][1]*1024)+pos_XY_buffer[1][0])*3)];
-            pos_Z[aaaeqewr][2] = ptr_pos3[(((pos_XY_buffer[2][1]*1024)+pos_XY_buffer[2][0])*3)];
+            pos_Z_X[aaaeqewr][0] = ptr_pos1[(((pos_XY_buffer[0][1]*1024)+pos_XY_buffer[0][0])*3)  ];
+            pos_Z_X[aaaeqewr][1] = ptr_pos2[(((pos_XY_buffer[1][1]*1024)+pos_XY_buffer[1][0])*3)  ];
+            pos_Z_X[aaaeqewr][2] = ptr_pos3[(((pos_XY_buffer[2][1]*1024)+pos_XY_buffer[2][0])*3)  ];
+
+            pos_Z_Y[aaaeqewr][0] = ptr_pos1[(((pos_XY_buffer[0][1]*1024)+pos_XY_buffer[0][0])*3)+1];
+            pos_Z_Y[aaaeqewr][1] = ptr_pos2[(((pos_XY_buffer[1][1]*1024)+pos_XY_buffer[1][0])*3)+1];
+            pos_Z_Y[aaaeqewr][2] = ptr_pos3[(((pos_XY_buffer[2][1]*1024)+pos_XY_buffer[2][0])*3)+1];
             
             aaaeqewr++;
         
@@ -583,42 +613,54 @@ void ransac(Mat &aafsa){
 
     }
 
-    int counter_correct_point_most = 0;
-    int counter_correct_point      = 0;
-    int counter_ssss               = 0;
+    int counter_correct_point_most_x = 0;
+    int counter_correct_point_most_y = 0;
+    int counter_correct_point_x = 0;
+    int counter_correct_point_y = 0;
+    int counter_ssss_x = 0;
+    int counter_ssss_y = 0;
 
-    float SLMA[3], SLMA_prev[3];
+    float SLMA_X[3], SLMA_prev_X[3];
+    float SLMA_Y[3], SLMA_prev_Y[3];
 
     for ( int qq=0; qq<sample_num; qq++ ) {
 
-        picked_pointer_addr_to_LSM( &pos_XY[qq][0][0], &pos_Z[qq][0], &SLMA[0] );
+        picked_pointer_addr_to_LSM( &pos_XY[qq][0][0], &pos_Z_X[qq][0], &SLMA_X[0] );
+        picked_pointer_addr_to_LSM( &pos_XY[qq][0][0], &pos_Z_Y[qq][0], &SLMA_Y[0] );
 
         // 받은 이미지의 X 값을 훑으면서 일정범위 사이에 점이 있으면 카운트를 셈
-        counter_correct_point = 0, counter_ssss = 0;
+        counter_correct_point_x = 0, counter_ssss_x = 0;
+        counter_correct_point_y = 0, counter_ssss_y = 0;
         float *ptr_pos1 = (float*)aafsa.data;
         for ( int a=0; a<1024; a++ ) {
             for ( int b=0; b<1024; b++ ) {
                 if ( ptr_pos1[(a*1024+b)*3]*ptr_pos1[(a*1024+b)*3+1] ) {
-                    float mean = ptr_pos1[(a*1024+b)*3]-((b*SLMA[0]+a*SLMA[1])+SLMA[2]);
-                    if ( (1>mean)>-1 ) counter_correct_point++;
+                    float mean_x = ptr_pos1[(a*1024+b)*3  ]-((b*SLMA_X[0]+a*SLMA_X[1])+SLMA_X[2]);
+                    float mean_y = ptr_pos1[(a*1024+b)*3+1]-((b*SLMA_Y[0]+a*SLMA_Y[1])+SLMA_Y[2]);
+                    if ( (dfdfdfqqq>mean_x)&&(mean_x>-dfdfdfqqq) ) counter_correct_point_x++;
+                    if ( (dfdfdfqqq>mean_y)&&(mean_y>-dfdfdfqqq) ) counter_correct_point_y++;
                 }
-                counter_ssss++;
+                counter_ssss_x++, counter_ssss_y++;
             }
         }
 
         // 카운트가 지금까지 세었던 것 중에 가장 높으면 업데이트함
-        if ( counter_correct_point>counter_correct_point_most ) {
-            counter_correct_point_most = counter_correct_point;
-            SLMA_prev[0]=SLMA[0],  SLMA_prev[1]=SLMA[1],  SLMA_prev[2]=SLMA[2];
-        }
+        if ( counter_correct_point_x>counter_correct_point_most_x )
+            counter_correct_point_most_x = counter_correct_point_x;
+            SLMA_prev_X[0]=SLMA_X[0],  SLMA_prev_X[1]=SLMA_X[1],  SLMA_prev_X[2]=SLMA_X[2];
+        if ( counter_correct_point_y>counter_correct_point_most_y )
+            counter_correct_point_most_y = counter_correct_point_y;
+            SLMA_prev_Y[0]=SLMA_Y[0],  SLMA_prev_Y[1]=SLMA_Y[1],  SLMA_prev_Y[2]=SLMA_Y[2];
 
-        printf(  "%d %d ==> %f,%f,%f \n",  counter_correct_point,  qq,  SLMA[0], SLMA[1], SLMA[2]  );
+        printf(  
+            "%d %d ==> %f,%f,%f \n",  
+            counter_correct_point_x,  qq,  
+            SLMA_X[0], SLMA_X[1], SLMA_X[2]  
+        );
 
     }
-    
-    float WWWW[3];
 
-    right_point( aafsa, SLMA_prev, WWWW );
+    right_point( aafsa, SLMA_prev_X, SLMA_prev_Y );
 
 }
 
@@ -736,12 +778,12 @@ void capture_plane     ( Mat &aafsa ){
 //# 파일 입출력
 //######################################################
 
-void aaaaaaa( Mat &qwerqer, int h, int w ){
+void aaaaaaa ( Mat &qwerqer, int h, int w ){
 
     //
     char a0[] = "ply\n";
     char a1[] = "format binary_little_endian 1.0\n";
-    char a2[] = "element vertex 100000          \n";
+    char a2[] = "element vertex 1000000         \n";
     char a3[] = "property float x\n";
     char a4[] = "property float y\n";
     char a5[] = "property float z\n";
@@ -777,13 +819,13 @@ void aaaaaaa( Mat &qwerqer, int h, int w ){
             buffer_1 = qwerqerqwerqwer[count+1];
             buffer_2 = qwerqerqwerqwer[count+2];
             count = count + 3;
-            if (buffer_0 * buffer_1 * buffer_2) {
-                buffer[count_buffer  ] = buffer_0;
-                buffer[count_buffer+1] = buffer_1;
-                buffer[count_buffer+2] = buffer_2;
+            //if (buffer_0 * buffer_1 * buffer_2) {
+                buffer[count_buffer  ] = buffer_0/100;
+                buffer[count_buffer+1] = buffer_1/100;
+                buffer[count_buffer+2] = buffer_2/100;
                 count_buffer = count_buffer + 3;
                 if(count_buffer>3072) fwrite(buffer,sizeof(float),3072,src), count_buffer = 0;
-            }
+            //}
         }
     }
 
@@ -791,16 +833,117 @@ void aaaaaaa( Mat &qwerqer, int h, int w ){
     
     fclose(src);
 
-    //src = fopen("32323.dfk","rb");
-    //printf("쓴걸 검위해 열었다. %d\n",src);
-    //if (src != NULL) {
-    //    while(!feof(src)) {
-    //        nRead=fread(buf,1,256,src);
-    //        printf("%s",buf);
-    //        printf("=========================%d\n",nRead);
-    //    }
-    //    fclose(src);
-    //}
+}
+void aaaaaaa0( Mat &qwerqer, int h, int w ){
+
+    //
+    char a0[] = "ply\n";
+    char a1[] = "format binary_little_endian 1.0\n";
+    char a2[] = "element vertex 1000000         \n";
+    char a3[] = "property float x\n";
+    char a4[] = "property float y\n";
+    char a5[] = "property float z\n";
+    char a6[] = "end_header\n";
+
+    //
+    FILE *src;
+    size_t nRead;
+
+    // 헤더
+    src = fopen("323230.ply","wb");
+
+    if (src != NULL) {
+        printf("file open OK \n");
+        fwrite(a0,1, 4,src), fwrite(a1,1,32,src), fwrite(a2,1,32,src), fwrite(a3,1,17,src);
+        fwrite(a4,1,17,src), fwrite(a5,1,17,src), fwrite(a6,1,11,src);
+    }
+
+    // 데이터
+    float buffer[3072] = {0};
+    float buffer_0 = 0;
+    float buffer_1 = 0;
+    float buffer_2 = 0;
+
+    uint64_t count        = 0;
+    uint64_t count_buffer = 0;
+
+    float * qwerqerqwerqwer = (float*) qwerqer.data;
+    
+    for (uint32_t y = 0; y < h; y++) {
+        for (uint32_t x = 0; x < w; x++) {
+            buffer_0 = qwerqerqwerqwer[count  ];
+            buffer_1 = qwerqerqwerqwer[count+1];
+            buffer_2 = qwerqerqwerqwer[count+2];
+            count = count + 3;
+            //if ( buffer_0*buffer_1*buffer_2 ) {
+                buffer[count_buffer  ] = (float)x/50;
+                buffer[count_buffer+1] = (float)y/50;
+                buffer[count_buffer+2] = buffer_0/100;
+                count_buffer = count_buffer + 3;
+            //}
+            if(count_buffer>3072) fwrite(buffer,sizeof(float),3072,src), count_buffer = 0;
+        }
+    }
+
+    if(count_buffer!=0) fwrite(buffer,sizeof(float),count_buffer,src), count_buffer = 0;
+    
+    fclose(src);
+
+}
+void aaaaaaa1( Mat &qwerqer, int h, int w ){
+
+    //
+    char a0[] = "ply\n";
+    char a1[] = "format binary_little_endian 1.0\n";
+    char a2[] = "element vertex 1000000         \n";
+    char a3[] = "property float x\n";
+    char a4[] = "property float y\n";
+    char a5[] = "property float z\n";
+    char a6[] = "end_header\n";
+
+    //
+    FILE *src;
+    size_t nRead;
+
+    // 헤더
+    src = fopen("323231.ply","wb");
+
+    if (src != NULL) {
+        printf("file open OK \n");
+        fwrite(a0,1, 4,src), fwrite(a1,1,32,src), fwrite(a2,1,32,src), fwrite(a3,1,17,src);
+        fwrite(a4,1,17,src), fwrite(a5,1,17,src), fwrite(a6,1,11,src);
+    }
+
+    // 데이터
+    float buffer[3072] = {0};
+    float buffer_0 = 0;
+    float buffer_1 = 0;
+    float buffer_2 = 0;
+
+    uint64_t count        = 0;
+    uint64_t count_buffer = 0;
+
+    float * qwerqerqwerqwer = (float*) qwerqer.data;
+    
+    for (uint32_t y = 0; y < h; y++) {
+        for (uint32_t x = 0; x < w; x++) {
+            buffer_0 = qwerqerqwerqwer[count  ];
+            buffer_1 = qwerqerqwerqwer[count+1];
+            buffer_2 = qwerqerqwerqwer[count+2];
+            count = count + 3;
+            //if ( buffer_0*buffer_1*buffer_2 ) {
+                buffer[count_buffer  ] = (float)x/50;
+                buffer[count_buffer+1] = (float)y/50;
+                buffer[count_buffer+2] = buffer_1/100;
+                count_buffer = count_buffer + 3;
+            //}
+            if(count_buffer>3072) fwrite(buffer,sizeof(float),3072,src), count_buffer = 0;
+        }
+    }
+
+    if(count_buffer!=0) fwrite(buffer,sizeof(float),count_buffer,src), count_buffer = 0;
+    
+    fclose(src);
 
 }
 
@@ -808,16 +951,18 @@ void aaaaaaa( Mat &qwerqer, int h, int w ){
 //#
 //######################################################
 
-void graycode_map(  Mat &aafsa  ){
+void graycode_map(  Mat &aafsa, int scann_calib_switch = 0  ){
 
     float plane_vectors[] = {    0, 0, 1.0,    0, 0, 600.0    };
     
-    //capture_plane( aafsa );
-    //image_to_plane( aafsa, plane_vectors );
-    //printf("%f, %f, %f,    %f, %f, %f \n\n",
-    //    plane_vectors[0], plane_vectors[1], plane_vectors[2],
-    //    plane_vectors[3], plane_vectors[4], plane_vectors[5]
-    //);
+    if ( scann_calib_switch ) {
+        //capture_plane( aafsa );
+        //image_to_plane( aafsa, plane_vectors );
+        //printf("%f, %f, %f,    %f, %f, %f \n\n",
+        //    plane_vectors[0], plane_vectors[1], plane_vectors[2],
+        //    plane_vectors[3], plane_vectors[4], plane_vectors[5]
+        //);
+    }
 
     Mat black     (h, w, CV_16SC1);
     Mat white     (h, w, CV_16SC1);
@@ -888,9 +1033,10 @@ void graycode_map(  Mat &aafsa  ){
 
     aafsa = bit_hvsdas;
 
-    ransac(aafsa);
-
-    cordination_to_point(  aafsa,  plane_vectors,  1024,1024  );
+    if ( scann_calib_switch ) {
+        ransac(aafsa);
+        //cordination_to_point(  aafsa,  plane_vectors,  1024,1024  );
+    }
     
 }
 
@@ -907,7 +1053,7 @@ void triangulation(  Mat &_p1, Mat &_p2,  Mat &postion,  float focus,  int h, in
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
             
-            image_map[a] = 0, image_map[a+1] = 0, image_map[a+2] = 0;
+            //image_map[a] = 0, image_map[a+1] = 0, image_map[a+2] = 0;
 
             if (  image_map[a]  *  image_map[a+1]  *  image_map[a+2]  ) {
 
@@ -941,7 +1087,7 @@ void triangulation(  Mat &_p1, Mat &_p2,  Mat &postion,  float focus,  int h, in
 
             }
 
-            a = a + 3;
+            a+=3;
 
         }
     }
@@ -969,19 +1115,13 @@ void processing(){
     //float plane_vectors[] = {    0, 0, 1.0,    0, 0, 600.0    };
     //cordination_to_point(  gray,  plane_vectors,  1024,1024  );
     
-    //Mat gray0;
     Mat gray1;
-    //graycode_map(gray0);
-    graycode_map(gray1);
-
+    graycode_map(gray1,1);
     printf("cordination_to_point finish \n");
-    //
-    //gray1 = gray1 / 100;
-    //aaaaaaa(gray1,projector_map_shape_y,projector_map_shape_x);
-    //printf("owari \n");
+    aaaaaaa(gray1,projector_map_shape_y,projector_map_shape_x);
+    printf("owari \n");
 
 }
-
 
 void thread_camera_update(){
 
@@ -998,6 +1138,7 @@ void thread_camera(){
     }
 
 }
+
 void thread_main  (){
     
     ////######################################################
@@ -1043,7 +1184,7 @@ void thread_main  (){
     //#
     //######################################################
 
-    sleep(5);
+    sleep(3);
 
     while (1) {
     
@@ -1053,6 +1194,9 @@ void thread_main  (){
         printf("aaaaaaaaaaaaaaaaaaa\n");
         
         processing();
+
+        int dfdf[3];
+        dfdf[100000]=35;
 
         break;
 
@@ -1068,7 +1212,6 @@ void thread_main  (){
     ////######################################################
     
 }
-
 
 int main (int, char**) {   
 
