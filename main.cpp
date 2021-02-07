@@ -17,6 +17,8 @@
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 
+#include <gtk/gtk.h>
+
 using namespace cv;  
 using namespace std;
 
@@ -480,18 +482,7 @@ int  is_triangle(  float *xyz1, float *xyz2, float *xyz3  ){
 
 float dfdfdfqqq = 0.01;
 
-void picked_pointer_addr_to_LSM( float *XY, float *mat_data, float *X ){
-
-    LSM( XY, 3, 3, mat_data, X ) ;
-    
-}
-void picked_pointer_addr_to_LSM11( float *XY, int y, int x, float *mat_data, float *X ){
-
-    LSM( XY, y, x, mat_data, X ) ;
-    
-}
-
-void right_point( Mat &image, float *weight, float *weight_y ){
+void right_point( Mat &image, float *weight_x, float *weight_y ){
 
     float *aaaaa_x = (float *)malloc( 4*1024*1024*3 );
     float *aaaaa_y = (float *)malloc( 4*1024*1024*3 );
@@ -501,22 +492,25 @@ void right_point( Mat &image, float *weight, float *weight_y ){
     int point_num_x = 0;
     int point_num_y = 0;
 
+    float mean;
+
     float *ptr_pos1 = (float*)image.data;
 
     for ( int a=0; a<1024; a++ ) {
         for ( int b=0; b<1024; b++ ) {
             if ( ptr_pos1[(a*1024+b)*3]*ptr_pos1[((a*1024+b)*3)+1] ) {
-                float mean = ptr_pos1[(a*1024+b)*3]-((b*weight[0]+a*weight[1])+weight[2]);
+                mean = ptr_pos1[(a*1024+b)*3]-((b*weight_x[0]+a*weight_x[1])+weight_x[2]);
                 if ( (dfdfdfqqq>mean)||(mean>-dfdfdfqqq) ) {
                     aaaaa_x[point_num_x*3  ]=(float)b;
-                    aaaaa_x[point_num_x*3+1]=(float)a;
-                    aaaaa_x[point_num_x*3+2]=(float)1;
-                    aaaaa_y[point_num_y*3  ]=(float)b;
-                    aaaaa_y[point_num_y*3+1]=(float)a;
-                    aaaaa_y[point_num_y*3+2]=(float)1;
+                    aaaaa_x[point_num_x*3+1]=(float)a, aaaaa_x[point_num_x*3+2]=(float)1;
                     bbbbb_x[point_num_x]=ptr_pos1[(a*1024+b)*3];
-                    bbbbb_y[point_num_y]=ptr_pos1[(a*1024+b)*3];
                     point_num_x++;
+                }
+                mean = ptr_pos1[(a*1024+b)*3]-((b*weight_y[0]+a*weight_y[1])+weight_y[2]);
+                if ( (dfdfdfqqq>mean)||(mean>-dfdfdfqqq) ) {
+                    aaaaa_y[point_num_y*3  ]=(float)b;
+                    aaaaa_y[point_num_y*3+1]=(float)a, aaaaa_y[point_num_y*3+2]=(float)1;
+                    bbbbb_y[point_num_y]=ptr_pos1[(a*1024+b)*3+1];
                     point_num_y++;
                 }
             }
@@ -527,8 +521,8 @@ void right_point( Mat &image, float *weight, float *weight_y ){
     
     float qqqq_x[3], qqqq_y[3];
 
-    picked_pointer_addr_to_LSM11( aaaaa_x, point_num_x, 3, bbbbb_x, &qqqq_x[0] );
-    picked_pointer_addr_to_LSM11( aaaaa_y, point_num_y, 3, bbbbb_y, &qqqq_y[0] );
+    LSM( aaaaa_x, point_num_x, 3, bbbbb_x, &qqqq_x[0] );
+    LSM( aaaaa_y, point_num_y, 3, bbbbb_y, &qqqq_y[0] );
 
     for ( int a=0; a<1024; a++ ) {
         for ( int b=0; b<1024; b++ ) {
@@ -582,16 +576,13 @@ void ransac(Mat &aafsa){
         if (  is_triangle(  ptr_pos1,  ptr_pos2,  ptr_pos3  )  ) {
             
             pos_XY[aaaeqewr][0][0] = pos_XY_buffer[0][0],
-            pos_XY[aaaeqewr][0][1] = pos_XY_buffer[0][1],
-            pos_XY[aaaeqewr][0][2] = 1,
+            pos_XY[aaaeqewr][0][1] = pos_XY_buffer[0][1], pos_XY[aaaeqewr][0][2] = 1,
 
             pos_XY[aaaeqewr][1][0] = pos_XY_buffer[1][0],
-            pos_XY[aaaeqewr][1][1] = pos_XY_buffer[1][1],
-            pos_XY[aaaeqewr][1][2] = 1,
+            pos_XY[aaaeqewr][1][1] = pos_XY_buffer[1][1], pos_XY[aaaeqewr][1][2] = 1,
 
             pos_XY[aaaeqewr][2][0] = pos_XY_buffer[2][0],
-            pos_XY[aaaeqewr][2][1] = pos_XY_buffer[2][1],
-            pos_XY[aaaeqewr][2][2] = 1,
+            pos_XY[aaaeqewr][2][1] = pos_XY_buffer[2][1], pos_XY[aaaeqewr][2][2] = 1,
         
             ptr_pos1 = (float*)aafsa.data;
             ptr_pos2 = (float*)aafsa.data;
@@ -625,8 +616,8 @@ void ransac(Mat &aafsa){
 
     for ( int qq=0; qq<sample_num; qq++ ) {
 
-        picked_pointer_addr_to_LSM( &pos_XY[qq][0][0], &pos_Z_X[qq][0], &SLMA_X[0] );
-        picked_pointer_addr_to_LSM( &pos_XY[qq][0][0], &pos_Z_Y[qq][0], &SLMA_Y[0] );
+        LSM( &pos_XY[qq][0][0], 3,3, &pos_Z_X[qq][0], &SLMA_X[0] );
+        LSM( &pos_XY[qq][0][0], 3,3, &pos_Z_Y[qq][0], &SLMA_Y[0] );
 
         // 받은 이미지의 X 값을 훑으면서 일정범위 사이에 점이 있으면 카운트를 셈
         counter_correct_point_x = 0, counter_ssss_x = 0;
@@ -699,7 +690,9 @@ void capture_algorithm  ( VideoCapture &cap ) {
             } 
 
             else if (image_type == 1) {
-                projector = projector_map_GRAY(  1024, 1024,  image_stage,  image_inv,  image_dir  );
+                projector = projector_map_GRAY(  
+                    1024, 1024,  image_stage,  image_inv,  image_dir  
+                );
                 camera2(projector);
                 waitKey(adfadf);
                 capture(cap, buffersasasa);
@@ -768,9 +761,14 @@ void capture_plane     ( Mat &aafsa ){
     image_type    = 2;
 
     ready_flag = 0;
-    while (ready_flag==0) usleep(40000);
+    while (ready_flag==0) usleep(10000);
     aafsa = buffersasasa;
     ready_flag = 1;
+
+}
+void capture_viewer    ( Mat &aafsa ){
+    
+    image_type    = 3;
 
 }
 
@@ -951,6 +949,123 @@ void aaaaaaa1( Mat &qwerqer, int h, int w ){
 //#
 //######################################################
 
+int shutdown = 0;
+GtkWidget *drawing_area;
+GdkPixbuf *pixbuf;
+guchar *pixels;
+void gui_preview_update( Mat &qwerqer ){
+
+    uint8_t* adfdf = (uint8_t*)qwerqer.data;
+
+    for ( int y=0; y<320; y++ ) 
+        for ( int x=0; x<480; x++ ) 
+            pixels[(y*480+x)*3  ] = adfdf[(y*480+x)*3  ],  
+            pixels[(y*480+x)*3+1] = adfdf[(y*480+x)*3+1], 
+            pixels[(y*480+x)*3+2] = adfdf[(y*480+x)*3+2];
+
+    gdk_threads_enter();
+    gtk_widget_queue_draw (drawing_area);
+    gdk_threads_leave();
+
+    printf("image update \n");
+
+}
+void gui_main(){
+
+    //printf("n_channels      : %d\n", gdk_pixbuf_get_n_channels(pixbuf)  );
+    //printf("has_alpha       : %d\n", gdk_pixbuf_get_has_alpha(pixbuf)  );
+    //printf("bits_per_sample : %d\n", gdk_pixbuf_get_bits_per_sample(pixbuf)  );
+    //printf("pixels          : %d\n", gdk_pixbuf_get_pixels(pixbuf)  );
+    //printf("%d", gdk_pixbuf_get_pixels_with_length(pixbuf)  );
+    //printf("get_width       : %d\n", gdk_pixbuf_get_width(pixbuf)  );
+    //printf("get_height      : %d\n", gdk_pixbuf_get_height(pixbuf)  );
+    
+    /* GtkWidget is the storage type for widgets */
+    GtkWidget *window;
+    GtkWidget *fixed___;
+    GtkWidget *button;
+    GtkWidget *button1;
+    GtkWidget *button2;
+    GtkWidget *button3;
+
+    pixbuf = gdk_pixbuf_new (  GDK_COLORSPACE_RGB,  0,8,  480,320  );
+    pixels = gdk_pixbuf_get_pixels (pixbuf);
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    gdk_threads_init ();
+    
+    /* Initialise GTK */
+    //gtk_init (&argc, &argv);
+    gtk_init (0, NULL);
+        
+    /* Create a new window */
+    window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title (GTK_WINDOW (window), "Fixed Container");
+    gtk_window_set_default_size (GTK_WINDOW(window), 640, 480);
+    gtk_window_set_position (GTK_WINDOW(window), GTK_WIN_POS_CENTER);
+
+    /* Here we connect the "destroy" event to a signal handler */ 
+    g_signal_connect (window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
+    
+    /* Sets the border width of the window. */
+    gtk_container_set_border_width (GTK_CONTAINER (window), 10);
+
+    /* Create a Fixed Container */
+    fixed___ = gtk_fixed_new ();
+    gtk_container_add (GTK_CONTAINER (window), fixed___);
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    button1      = gtk_button_new_with_label ("Press 1");
+    button2      = gtk_button_new_with_label ("Press 2");
+    button3      = gtk_button_new_with_label ("Press 3");
+	drawing_area = gtk_image_new_from_pixbuf (pixbuf);
+    
+    //g_signal_connect (button, "clicked", G_CALLBACK (move_button), (gpointer) fixed___);
+    //g_signal_connect (button, "clicked", G_CALLBACK (move_button), (gpointer) fixed___);
+    //g_signal_connect (button, "clicked", G_CALLBACK (move_button), (gpointer) fixed___);
+
+    gtk_fixed_put ( GTK_FIXED(fixed___),      button1,  10,  10 );
+    gtk_fixed_put ( GTK_FIXED(fixed___),      button2,  10,  60 );
+    gtk_fixed_put ( GTK_FIXED(fixed___),      button3,  10, 110 );
+    gtk_fixed_put ( GTK_FIXED(fixed___), drawing_area, 130,  20 );
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    //for ( gint i=1; i<=3; i++ ) {
+    //    /* Creates a new button with the label "Press me" */
+    //    button = gtk_button_new_with_label ("Press me");
+    //    /* When the button receives the "clicked" signal, it will call the
+    //    * function move_button() passing it the Fixed Container as its
+    //    * argument. */
+    //    g_signal_connect (button, "clicked", G_CALLBACK (move_button), (gpointer) fixed___);
+    //    /* This packs the button into the fixed containers window. */
+    //    gtk_fixed_put (GTK_FIXED (fixed___), button, i*50, i*50);
+    //
+    //    /* The final step is to display this newly created widget. */
+    //    gtk_widget_show (button);
+    //}
+
+    /* Display the window */
+    gtk_widget_show (fixed___);
+    gtk_widget_show (button1);
+    gtk_widget_show (button2);
+    gtk_widget_show (button3);
+    gtk_widget_show (drawing_area);
+    gtk_widget_show (window);
+        
+    /* Enter the event loop */
+    gtk_main ();
+
+    shutdown = 1;
+
+}
+
+//######################################################
+//#
+//######################################################
+
 void graycode_map(  Mat &aafsa, int scann_calib_switch = 0  ){
 
     float plane_vectors[] = {    0, 0, 1.0,    0, 0, 600.0    };
@@ -1118,28 +1233,44 @@ void processing(){
     Mat gray1;
     graycode_map(gray1,1);
     printf("cordination_to_point finish \n");
-    aaaaaaa(gray1,projector_map_shape_y,projector_map_shape_x);
+    aaaaaaa (gray1,projector_map_shape_y,projector_map_shape_x);
+    aaaaaaa0(gray1,projector_map_shape_y,projector_map_shape_x);
+    aaaaaaa1(gray1,projector_map_shape_y,projector_map_shape_x);
     printf("owari \n");
 
 }
 
-void thread_camera_update(){
-
-}
 void thread_camera(){
 
-    while(1){
-        usleep(5000);
+    if ( !cap.isOpened() ) printf("카메라를 열수 없습니다. \n");  
+
+	cap.set( CAP_PROP_FRAME_WIDTH , w );
+	cap.set( CAP_PROP_FRAME_HEIGHT, h );
+	cap.set( CAP_PROP_ISO_SPEED, 100 );
+	//cap.set( CAP_PROP_EXPOSURE, 0.1 );
+	cap.set( CAP_PROP_FPS, 30);
+    
+    sleep(2);
+
+    Mat B;
+
+    while ( 1 ) {
+
         capture_algorithm(cap);
         //if(buffer_flag==0) capture(cap, buffer), buffer_flag = 1, buffer_counter++;
         //cout << "captured!\n"<<buffer_counter<<endl<<endl;
         //printf("bbbbbbbbbbbbbbb\n");
         //break;
+        
+        //cap.grab(),  cap.retrieve(B),  gui_preview_update(B);
+        //if ( shutdown ) break;
+        //usleep(50000);
+
     }
 
 }
 
-void thread_main  (){
+void thread_main(){
     
     ////######################################################
     //clock_t start, start1, end, end1;
@@ -1154,14 +1285,6 @@ void thread_main  (){
 
     namedWindow("camera1", 1);
     namedWindow("camera2", 1);
-
-    if (!cap.isOpened())  printf("카메라를 열수 없습니다. \n");  
-
-	cap.set( CAP_PROP_FRAME_WIDTH , w );
-	cap.set( CAP_PROP_FRAME_HEIGHT, h );
-	cap.set( CAP_PROP_ISO_SPEED, 100 );
-	//cap.set( CAP_PROP_EXPOSURE, 0.1 );
-	cap.set( CAP_PROP_FPS, 30);
 
     //######################################################
     //#
@@ -1178,29 +1301,29 @@ void thread_main  (){
 
     for ( int k = 0; k < cols; k++ )
         for ( int j = 0; j < rows; j++ )
-            objectPoints.push_back(cv::Point3f(float( k*square_size ), float( j*square_size ), 0));
+            objectPoints.push_back(
+                cv::Point3f(float( k*square_size ), float( j*square_size ), 0)
+            );
 
     //######################################################
     //#
     //######################################################
 
-    sleep(3);
-
     while (1) {
     
         capture_algorithm_stop ();
         capture_algorithm_start();
-
-        printf("aaaaaaaaaaaaaaaaaaa\n");
-        
         processing();
 
-        int dfdf[3];
-        dfdf[100000]=35;
+        printf("aaaaaaaaaaaaaaaaaaa\n");
+
+        //gui_main();
 
         break;
 
     }
+
+    int df[3]; df[34343];
    
     ////######################################################
     //end     = clock(); //시간 측정 끝
@@ -1217,7 +1340,7 @@ int main (int, char**) {
 
     printf("aaaaaaaaaaaaaaaaaaa");
     printf("aaaaaaaaaaaaaaaaaaa");
-    thread hi0(thread_main  );
+    thread hi0(thread_main);
     thread hi1(thread_camera);
     hi0.join();
     hi1.join();
