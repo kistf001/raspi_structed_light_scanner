@@ -70,7 +70,7 @@ void cordination_to_point( Mat &Map_hv, float *plane_vectors, uint32_t h, uint32
 Mat  projector_map_GRAY(  int h,  int w,  int stage,  int inv,  int direction  );
 Mat  projector_map_LAMP(  int h,  int w,  int inv  );
 
-void processing( VideoCapture &cap );
+void processing();
 
 //######################################################
 //# 수표현도구
@@ -670,26 +670,24 @@ int image_stage   = 0;  // graycode
 int image_onoff   = 0;  // background
 int ready_flag    = 0;
 int capture_algorithm_state = 0;
-void capture_algorithm  ( VideoCapture &cap ) {
+void capture_algorithm( VideoCapture &cap ){
 
     static Mat projector;
 
     //######################################################
     //#
     //######################################################
-    while (capture_algorithm_state) {
+    if ( capture_algorithm_state ) {
 
-        if(ready_flag == 0){
+        if ( ready_flag==0 ) {
 
-            if (image_type == 0) {
+            if (image_type == 1) {
                 projector = projector_map_LAMP(  1024,  1024,  image_onoff  );
                 camera2(projector);
                 waitKey(adfadf);
                 capture(cap, buffersasasa);
                 ready_flag = 1;
-            } 
-
-            else if (image_type == 1) {
+            } else if (image_type == 2) {
                 projector = projector_map_GRAY(  
                     1024, 1024,  image_stage,  image_inv,  image_dir  
                 );
@@ -697,23 +695,17 @@ void capture_algorithm  ( VideoCapture &cap ) {
                 waitKey(adfadf);
                 capture(cap, buffersasasa);
                 ready_flag = 1;
-            }
-
-            else if (image_type == 2) {
+            } else if (image_type == 3) {
+                capture(cap, buffersasasa);
+                ready_flag = 1;
+            } else if (image_type == 4) {
                 capture(cap, buffersasasa);
                 ready_flag = 1;
             }
 
         }
 
-    }
-    //######################################################
-
-
-    //######################################################
-    //#
-    //######################################################
-    if(capture_algorithm_state==0){
+    } else {
 
         image_type    = 0;
         image_inv     = 0;
@@ -723,7 +715,7 @@ void capture_algorithm  ( VideoCapture &cap ) {
         ready_flag    = 0;
 
     }
-    //######################################################
+    
 
 }
 void capture_algorithm_start(){
@@ -734,18 +726,19 @@ void capture_algorithm_stop (){
 }
 void capture_background( Mat &aafsa, int color ){
 
-    image_type  = 0;
+    image_type  = 1;
     image_onoff = color;
 
     ready_flag = 0;
     while (ready_flag==0) usleep(10000);
     aafsa = buffersasasa;
     ready_flag = 1;
+    image_type = 0;
     
 }
-void capture_graycode  ( Mat &aafsa, int stage, int invert, int dir ){
+void capture_graycode( Mat &aafsa, int stage, int invert, int dir ){
     
-    image_type    = 1;
+    image_type    = 2;
     image_inv     = invert;
     image_dir     = dir;
     image_stage   = stage;
@@ -754,22 +747,31 @@ void capture_graycode  ( Mat &aafsa, int stage, int invert, int dir ){
     while (ready_flag==0) usleep(10000);
     aafsa = buffersasasa;
     ready_flag = 1;
+    image_type = 0;
 
 }
-void capture_plane     ( Mat &aafsa ){
+void capture_plane( Mat &aafsa ){
     
-    image_type    = 2;
+    image_type = 3;
 
     ready_flag = 0;
     while (ready_flag==0) usleep(10000);
     aafsa = buffersasasa;
     ready_flag = 1;
+    image_type = 0;
 
 }
-void capture_viewer    ( Mat &aafsa ){
+void capture_viewer( Mat &aafsa ){
     
-    image_type    = 3;
+    image_type = 4;
 
+    ready_flag = 0;
+    while (ready_flag==0) usleep(10000);
+    aafsa = buffersasasa;
+    aafsa.convertTo(aafsa, CV_8UC3);
+    ready_flag = 1;
+    image_type = 0;
+    
 }
 
 //######################################################
@@ -949,28 +951,21 @@ void aaaaaaa1( Mat &qwerqer, int h, int w ){
 //#
 //######################################################
 
-int shutdown = 0;
+int flag_process_run=0;
+
+//######################################################
+
+int shutdown=0;
+
 GtkWidget *drawing_area;
 GdkPixbuf *pixbuf;
 guchar *pixels;
-void gui_preview_update( Mat &qwerqer ){
 
-    uint8_t* adfdf = (uint8_t*)qwerqer.data;
-
-    for ( int y=0; y<320; y++ ) 
-        for ( int x=0; x<480; x++ ) 
-            pixels[(y*480+x)*3  ] = adfdf[(y*480+x)*3  ],  
-            pixels[(y*480+x)*3+1] = adfdf[(y*480+x)*3+1], 
-            pixels[(y*480+x)*3+2] = adfdf[(y*480+x)*3+2];
-
-    gdk_threads_enter();
-    gtk_widget_queue_draw (drawing_area);
-    gdk_threads_leave();
-
-    printf("image update \n");
-
+static void move_button( GtkWidget *button, GtkWidget *other_widget ){
+    flag_process_run=1, printf("=====move_button====\n");
 }
-void gui_main(){
+
+void gui_preview_update( Mat &qwerqer ){
 
     //printf("n_channels      : %d\n", gdk_pixbuf_get_n_channels(pixbuf)  );
     //printf("has_alpha       : %d\n", gdk_pixbuf_get_has_alpha(pixbuf)  );
@@ -979,6 +974,27 @@ void gui_main(){
     //printf("%d", gdk_pixbuf_get_pixels_with_length(pixbuf)  );
     //printf("get_width       : %d\n", gdk_pixbuf_get_width(pixbuf)  );
     //printf("get_height      : %d\n", gdk_pixbuf_get_height(pixbuf)  );
+
+    uint8_t* adfdf = (uint8_t*)qwerqer.data;
+
+    for ( int y=0; y<160; y++ ) 
+        for ( int x=0; x<240; x++ ) 
+            //pixels[(y*480+x)*3  ] = adfdf[(y*640+x)*3  ],  
+            //pixels[(y*480+x)*3+1] = adfdf[(y*640+x)*3+1], 
+            //pixels[(y*480+x)*3+2] = adfdf[(y*640+x)*3+2];
+            pixels[(y*480+x)*3  ] += 100,  
+            pixels[(y*480+x)*3+1] += 200, 
+            pixels[(y*480+x)*3+2] += 130;
+
+    gdk_threads_enter();
+    gtk_widget_queue_draw (drawing_area);
+    gdk_threads_leave();
+
+    printf("image update \n");
+
+}
+
+void gui_main(){
     
     /* GtkWidget is the storage type for widgets */
     GtkWidget *window;
@@ -988,12 +1004,12 @@ void gui_main(){
     GtkWidget *button2;
     GtkWidget *button3;
 
+    ////////////////////////////////////////////////////////////////////////////////
     pixbuf = gdk_pixbuf_new (  GDK_COLORSPACE_RGB,  0,8,  480,320  );
     pixels = gdk_pixbuf_get_pixels (pixbuf);
-
     ////////////////////////////////////////////////////////////////////////////////
 
-    gdk_threads_init ();
+    //gdk_threads_init ();
     
     /* Initialise GTK */
     //gtk_init (&argc, &argv);
@@ -1022,7 +1038,7 @@ void gui_main(){
     button3      = gtk_button_new_with_label ("Press 3");
 	drawing_area = gtk_image_new_from_pixbuf (pixbuf);
     
-    //g_signal_connect (button, "clicked", G_CALLBACK (move_button), (gpointer) fixed___);
+    g_signal_connect (button1, "clicked", G_CALLBACK (move_button), (gpointer) fixed___);
     //g_signal_connect (button, "clicked", G_CALLBACK (move_button), (gpointer) fixed___);
     //g_signal_connect (button, "clicked", G_CALLBACK (move_button), (gpointer) fixed___);
 
@@ -1048,17 +1064,15 @@ void gui_main(){
     //}
 
     /* Display the window */
+    gtk_widget_show (window);
     gtk_widget_show (fixed___);
     gtk_widget_show (button1);
     gtk_widget_show (button2);
     gtk_widget_show (button3);
     gtk_widget_show (drawing_area);
-    gtk_widget_show (window);
         
     /* Enter the event loop */
     gtk_main ();
-
-    shutdown = 1;
 
 }
 
@@ -1109,7 +1123,7 @@ void graycode_map(  Mat &aafsa, int scann_calib_switch = 0  ){
         bit_buffer = image_to_bit(  black,  white,  buffer,  buffer_inv  );
         bit_buffer.convertTo(bit_buffer, CV_16UC1);
         image_to_bit_stacking(  bit_h,  bit_buffer,  stage  );
-        //printf("%d\n",stage);
+        printf("%d\n",stage);
     }
     
     for ( int stage = 0; stage < 10; stage++ ) {
@@ -1121,7 +1135,7 @@ void graycode_map(  Mat &aafsa, int scann_calib_switch = 0  ){
         bit_buffer = image_to_bit(  black,  white,  buffer,  buffer_inv  );
         bit_buffer.convertTo(bit_buffer, CV_16UC1);
         image_to_bit_stacking(  bit_v,  bit_buffer,  stage  );
-        //printf("%d\n",stage);
+        printf("%d\n",stage);
     }
 
     //######################################################
@@ -1231,8 +1245,11 @@ void processing(){
     //cordination_to_point(  gray,  plane_vectors,  1024,1024  );
     
     Mat gray1;
+    printf("graycode_map start \n");
+
     graycode_map(gray1,1);
     printf("cordination_to_point finish \n");
+
     aaaaaaa (gray1,projector_map_shape_y,projector_map_shape_x);
     aaaaaaa0(gray1,projector_map_shape_y,projector_map_shape_x);
     aaaaaaa1(gray1,projector_map_shape_y,projector_map_shape_x);
@@ -1240,110 +1257,74 @@ void processing(){
 
 }
 
+//######################################################
+//#
+//######################################################
+
+void thread_processing(){
+
+    capture_algorithm_stop();
+    capture_algorithm_start();
+    
+    while(1){
+        if ( flag_process_run ) processing(), flag_process_run=0, printf("OKPRE\n");
+        if ( shutdown ) break;
+        usleep(100000);
+    }
+    
+}
 void thread_camera(){
 
     if ( !cap.isOpened() ) printf("카메라를 열수 없습니다. \n");  
 
+	//cap.set( CAP_PROP_EXPOSURE, 0.1 );
 	cap.set( CAP_PROP_FRAME_WIDTH , w );
 	cap.set( CAP_PROP_FRAME_HEIGHT, h );
 	cap.set( CAP_PROP_ISO_SPEED, 100 );
-	//cap.set( CAP_PROP_EXPOSURE, 0.1 );
 	cap.set( CAP_PROP_FPS, 30);
-    
+
     sleep(2);
 
-    Mat B;
-
     while ( 1 ) {
-
         capture_algorithm(cap);
-        //if(buffer_flag==0) capture(cap, buffer), buffer_flag = 1, buffer_counter++;
-        //cout << "captured!\n"<<buffer_counter<<endl<<endl;
-        //printf("bbbbbbbbbbbbbbb\n");
-        //break;
-        
-        //cap.grab(),  cap.retrieve(B),  gui_preview_update(B);
-        //if ( shutdown ) break;
-        //usleep(50000);
-
+        if ( shutdown )break;
+        usleep(20000);
     }
 
 }
-
 void thread_main(){
-    
-    ////######################################################
-    //clock_t start, start1, end, end1;
-    //double result, result1;
-    //int i,j;
-    //int sum = 0;
-    //start = clock(); //시간 측정 시작
-    //start1 = time(NULL); // 시간 측정 시작
-    ////######################################################
-
-    graycode_lookup_table(  bit,  Gray2Bin,  Bin2Gray  );
-
-    namedWindow("camera1", 1);
-    namedWindow("camera2", 1);
 
     //######################################################
     //#
     //######################################################
 
-    cv::Mat gray ;
-    cv::Mat A(3, 3, CV_64FC1, m);						// camera matrix
-    cv::Mat distCoeffs(4, 1, CV_64FC1, d);
-    cv::Mat rvecs;
-    cv::Mat tvecs;
-    vector<Point3f> objectPoints;
-    vector<Point2f> imagePoint;
-    Size patternsize(7,4); //interior number of corners
-
-    for ( int k = 0; k < cols; k++ )
-        for ( int j = 0; j < rows; j++ )
-            objectPoints.push_back(
-                cv::Point3f(float( k*square_size ), float( j*square_size ), 0)
-            );
+    graycode_lookup_table(  bit,  Gray2Bin,  Bin2Gray  );
 
     //######################################################
     //#
     //######################################################
 
     while (1) {
-    
-        capture_algorithm_stop ();
-        capture_algorithm_start();
-        processing();
-
-        printf("aaaaaaaaaaaaaaaaaaa\n");
-
-        //gui_main();
-
-        break;
-
+        //gui_main(), printf("gui_main finish\n"); break;
+        //gui_main(), printf("gui_main finish\n"); break;
+        flag_process_run = 1; break;
     }
-
-    int df[3]; df[34343];
-   
-    ////######################################################
-    //end     = clock(); //시간 측정 끝
-    //end1    = time(NULL); // 시간 측정 끝
-    //result  = (double)(end - start);
-    //result1 = (double)(end1 - start1);
-    //printf("%f\n", result);
-    //printf("%f\n", result1); //결과 출력
-    ////######################################################
     
 }
 
+//######################################################
+//#
+//######################################################
+
 int main (int, char**) {   
 
-    printf("aaaaaaaaaaaaaaaaaaa");
-    printf("aaaaaaaaaaaaaaaaaaa");
     thread hi0(thread_main);
     thread hi1(thread_camera);
+    thread hi2(thread_processing);
     hi0.join();
     hi1.join();
+    hi2.join();
     
     return 0;
+
 }
