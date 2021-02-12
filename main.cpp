@@ -56,7 +56,6 @@ void graycode_lookup_table(int size, uint16_t *Gray2Bin, uint16_t *Bin2Gray);
 
 void spliter(Mat &AAAA);
 void capture(VideoCapture &A, Mat &B);
-void camera1(Mat &frame);
 void camera2(Mat &frame);
 
 void image_to_plane(Mat &gray, Scalar &aaaaaadfffff);
@@ -74,7 +73,7 @@ void processing();
 
 void gui_main();
 void gui_preview_update(Mat &qwerqer);
-static void move_button(GtkWidget *button, GtkWidget *other_widget);
+static void move_button(GtkWidget *button);
 static void gui_graycode_show(Mat &qwerqer);
 
 //######################################################
@@ -95,44 +94,6 @@ void graycode_lookup_table(int size, uint16_t *Gray2Bin, uint16_t *Bin2Gray)
         Bin2Gray[binary] = gray_code;
         Gray2Bin[gray_code] = binary;
     }
-}
-
-//######################################################
-//# image_control
-//######################################################
-
-void spliter(Mat &AAAA)
-{
-
-    //Mat img(5,5,CV_64FC3);
-    //Mat AAAA;//, ch2, ch3;
-
-    // "channels" is a vector of 3 Mat arrays:
-    vector<Mat> channels(3);
-
-    // split img:
-    split(AAAA, channels);
-
-    // get the channels (dont forget they follow BGR order in OpenCV)
-    AAAA = channels[2];
-    //ch2 = channels[1];
-    //ch3 = channels[2];
-}
-void capture(VideoCapture &A, Mat &B)
-{
-    A.grab(), A.grab(), A.grab(), A.grab(), A.grab(), A.grab(), A.retrieve(B); //A >> B;
-    spliter(B);
-}
-void camera1(Mat &frame)
-{
-    moveWindow("camera1", 1, 1);
-    imshow("camera1", frame);
-}
-void camera2(Mat &frame)
-{
-    //moveWindow("camera2", 1, 1);
-    //imshow("camera2", frame);
-    gui_graycode_show(frame);
 }
 
 //######################################################
@@ -707,7 +668,28 @@ void ransac(Mat &aafsa)
 //#
 //######################################################
 
-VideoCapture cap(0);
+void spliter(Mat &AAAA)
+{
+    //Mat img(5,5,CV_64FC3);
+    //Mat AAAA;//, ch2, ch3;
+    // "channels" is a vector of 3 Mat arrays:
+    vector<Mat> channels(3);
+    // split img:
+    split(AAAA, channels);
+    // get the channels (dont forget they follow BGR order in OpenCV)
+    AAAA = channels[2];
+    //ch2 = channels[1];
+    //ch3 = channels[2];
+}
+void capture(VideoCapture &A, Mat &B)
+{
+    A.grab(), A.grab(), A.grab(), A.grab(), A.grab(), A.grab(), A.retrieve(B); //A >> B;
+    spliter(B);
+}
+void camera2(Mat &frame)
+{
+    gui_graycode_show(frame);
+}
 
 Mat buffersasasa(h, w, CV_16SC1);
 
@@ -717,84 +699,77 @@ int image_dir = 0;   // graycode
 int image_stage = 0; // graycode
 int image_onoff = 0; // background
 int ready_flag = 0;
-int capture_algorithm_state = 0;
 void capture_algorithm(VideoCapture &cap)
 {
     static Mat projector;
     //######################################################
     //#
     //######################################################
-    if (capture_algorithm_state)
+    if (ready_flag)
     {
-        if (ready_flag == 0)
+        if (image_type == 1)
         {
-            if (image_type == 1)
-            {
-                projector = projector_map_LAMP(1024, 1024, image_onoff);
-                camera2(projector), usleep(600000); //waitKey(adfadf);
-                capture(cap, buffersasasa), ready_flag = 1, image_type = 0;
-            }
-            else if (image_type == 2)
-            {
-                projector = projector_map_GRAY(
-                    1024, 1024, image_stage, image_inv, image_dir);
-                camera2(projector), usleep(600000); //waitKey(adfadf);
-                capture(cap, buffersasasa), ready_flag = 1, image_type = 0;
-            }
-            else if (image_type == 3)
-                capture(cap, buffersasasa), ready_flag = 1, image_type = 0;
-            else if (image_type == 4)
-                capture(cap, buffersasasa), ready_flag = 1, image_type = 0;
+            projector = projector_map_LAMP(1024, 1024, image_onoff);
+            image_onoff = 0;
+            camera2(projector), usleep(600000); //waitKey(adfadf);
+            capture(cap, buffersasasa);
         }
+        else if (image_type == 2)
+        {
+            projector = projector_map_GRAY(
+                1024, 1024, image_stage, image_inv, image_dir);
+            image_stage = 0, image_inv = 0, image_dir = 0;
+            camera2(projector), usleep(600000); //waitKey(adfadf);
+            capture(cap, buffersasasa);
+        }
+        else if (image_type == 3)
+            capture(cap, buffersasasa);
+        else if (image_type == 4)
+            capture(cap, buffersasasa);
+        else if (image_type == -1)
+        {
+            printf("camera setup \n");
+        }
+        image_type = 0, ready_flag = 0;
     }
-    else
-    {
-        image_type = 0;
-        image_inv = 0;
-        image_dir = 0;
-        image_stage = 0;
-        image_onoff = 0;
-        ready_flag = 1;
-    }
-}
-void capture_algorithm_start()
-{
-    capture_algorithm_state = 1;
-}
-void capture_algorithm_stop()
-{
-    capture_algorithm_state = 0;
 }
 void capture_background(Mat &aafsa, int color)
 {
     image_onoff = color;
-    image_type = 1, ready_flag = 0;
-    while (ready_flag == 0)
+    image_type = 1, ready_flag = 1;
+    while (ready_flag)
         usleep(10000);
     aafsa = buffersasasa;
 }
 void capture_graycode(Mat &aafsa, int stage, int invert, int dir)
 {
     image_inv = invert, image_dir = dir, image_stage = stage;
-    image_type = 2, ready_flag = 0;
-    while (ready_flag == 0)
+    image_type = 2, ready_flag = 1;
+    while (ready_flag)
         usleep(10000);
     aafsa = buffersasasa;
 }
 void capture_plane(Mat &aafsa)
 {
-    image_type = 3, ready_flag = 0;
-    while (ready_flag == 0)
+    image_type = 3, ready_flag = 1;
+    while (ready_flag)
         usleep(10000);
     aafsa = buffersasasa;
 }
 void capture_viewer(Mat &aafsa)
 {
-    image_type = 4, ready_flag = 0;
-    while (ready_flag == 0)
+    image_type = 4, ready_flag = 1;
+    while (ready_flag)
         usleep(10000);
     aafsa = buffersasasa;
     //aafsa.convertTo(aafsa, CV_8UC3);
+}
+void capture_setting(int a, int b)
+{
+    image_type = -1, ready_flag = 1;
+    while (ready_flag)
+        usleep(10000);
+    printf("finish\n");
 }
 
 //######################################################
@@ -992,7 +967,6 @@ void aaaaaaa1(Mat &qwerqer, int h, int w)
 int flag_process_run = 0;
 
 int shutdown = 0;
-int stop = 0;
 
 GtkWidget *popwindow;
 
@@ -1012,22 +986,25 @@ void graycode_window_off()
     gtk_widget_hide(popwindow);
 }
 
-static void move_button(GtkWidget *button, GtkWidget *other_widget)
-{
-    flag_process_run=1;
-    //Mat dfd;
-    //capture_viewer(dfd);
-    //gui_preview_update(dfd);
-    //printf("=====move_button====\n");
-}
 static void close_button()
 {
-    stop = 1;
-    sleep(1);
     shutdown = 1;
-    sleep(1);
-    stop = 0;
-    gtk_main_quit();
+}
+static void move_button1(GtkWidget *button)
+{
+    flag_process_run=1;
+}
+static void move_button2(GtkWidget *button)
+{
+    flag_process_run=2;
+}
+static void slider_camera_control_black(){
+    thresholder_black;
+    printf("setting runs\n");
+}
+static void slider_camera_control_white(){
+    thresholder_white;
+    printf("setting runs\n");
 }
 
 void gui_preview_update(Mat &qwerqer)
@@ -1044,16 +1021,70 @@ void gui_preview_update(Mat &qwerqer)
     uint8_t *adfdf = (uint8_t *)qwerqer.data;
 
     for (int y = 0; y < 480; y++)
+    {
         for (int x = 0; x < 640; x++)
-            pixels_preview[(y*640+x)*3  ] = adfdf[(y*640+x)],
-            pixels_preview[(y*640+x)*3+1] = adfdf[(y*640+x)],
-            pixels_preview[(y*640+x)*3+2] = adfdf[(y*640+x)];
+        {
+            int www = (y * 640 + x), qqq = www * 3;
+            pixels_preview[qqq] = adfdf[www];
+            pixels_preview[qqq + 1] = adfdf[www];
+            pixels_preview[qqq + 2] = adfdf[www];
+        }
+    }
 
     for (int x = 0; x < 640; x++)
     {
-        int qwerew, rtrtrt = 120;
+        int qwerew, oooo, rtrtrt, rertete;
+
+        rtrtrt = 120;
         qwerew = rtrtrt;
-        int oooo = rtrtrt - (pixels_preview[(rtrtrt * 640 + x) * 3] >> 2) + 32;
+        rertete = pixels_preview[(rtrtrt * 640 + x) * 3];
+        oooo = rtrtrt - (rertete >> 2) + 32;
+        pixels_preview[(oooo * 640 + x) * 3] = 255;
+        pixels_preview[(oooo * 640 + x) * 3 + 1] = 0;
+        pixels_preview[(oooo * 640 + x) * 3 + 2] = 0;
+        qwerew = (rtrtrt * 640 + x) * 3;
+        pixels_preview[qwerew] = 0;
+        pixels_preview[qwerew + 1] = 255;
+        pixels_preview[qwerew + 2] = 0;
+        qwerew = ((rtrtrt + 32) * 640 + x) * 3;
+        pixels_preview[qwerew] = 0;
+        pixels_preview[qwerew + 1] = 0;
+        pixels_preview[qwerew + 2] = 255;
+        qwerew = ((rtrtrt - 32) * 640 + x) * 3;
+        pixels_preview[qwerew] = 0;
+        pixels_preview[qwerew + 1] = 0;
+        pixels_preview[qwerew + 2] = 255;
+        oooo = rtrtrt - (rertete >> 2) + 32 - (thresholder_black >> 2);
+        pixels_preview[(oooo * 640 + x) * 3] = 255;
+        pixels_preview[(oooo * 640 + x) * 3 + 1] = 255;
+        pixels_preview[(oooo * 640 + x) * 3 + 2] = 0;
+        oooo = rtrtrt - (rertete >> 2) + 32 + (thresholder_white >> 2);
+        pixels_preview[(oooo * 640 + x) * 3] = 255;
+        pixels_preview[(oooo * 640 + x) * 3 + 1] = 255;
+        pixels_preview[(oooo * 640 + x) * 3 + 2] = 0;
+
+        rtrtrt = 240;
+        qwerew = rtrtrt;
+        oooo = rtrtrt - (pixels_preview[(rtrtrt * 640 + x) * 3] >> 2) + 32;
+        pixels_preview[(oooo * 640 + x) * 3] = 255;
+        pixels_preview[(oooo * 640 + x) * 3 + 1] = 0;
+        pixels_preview[(oooo * 640 + x) * 3 + 2] = 0;
+        qwerew = (rtrtrt * 640 + x) * 3;
+        pixels_preview[qwerew] = 0;
+        pixels_preview[qwerew + 1] = 255;
+        pixels_preview[qwerew + 2] = 0;
+        qwerew = ((rtrtrt + 32) * 640 + x) * 3;
+        pixels_preview[qwerew] = 0;
+        pixels_preview[qwerew + 1] = 0;
+        pixels_preview[qwerew + 2] = 255;
+        qwerew = ((rtrtrt - 32) * 640 + x) * 3;
+        pixels_preview[qwerew] = 0;
+        pixels_preview[qwerew + 1] = 0;
+        pixels_preview[qwerew + 2] = 255;
+
+        rtrtrt = 360;
+        qwerew = rtrtrt;
+        oooo = rtrtrt - (pixels_preview[(rtrtrt * 640 + x) * 3] >> 2) + 32;
         pixels_preview[(oooo * 640 + x) * 3] = 255;
         pixels_preview[(oooo * 640 + x) * 3 + 1] = 0;
         pixels_preview[(oooo * 640 + x) * 3 + 2] = 0;
@@ -1100,14 +1131,16 @@ void gui_main()
 
     /* GtkWidget is the storage type for widgets */
     GtkWidget *window;
+    
     GtkWidget *fixed___0;
     GtkWidget *fixed___1;
+    
     GtkWidget *button;
     GtkWidget *button1;
     GtkWidget *button2;
     GtkWidget *button3;
     GtkWidget *button_close;
-
+    
     /*  */
     pixbuf_preview = gdk_pixbuf_new(GDK_COLORSPACE_RGB, 0, 8, 640, 480);
     pixbuf_graycode = gdk_pixbuf_new(GDK_COLORSPACE_RGB, 0, 8, 1000, 1000);
@@ -1141,47 +1174,63 @@ void gui_main()
 
     /* Here we connect the "destroy" event to a signal handler */
     g_signal_connect(window, "destroy", G_CALLBACK(close_button), NULL);
-
-    /* Sets the border width of the window. */
     gtk_container_set_border_width(GTK_CONTAINER(window), 3);
+    gtk_widget_show(window);
+    //gtk_widget_show(popwindow);
 
     /* Create a Fixed Container */
     fixed___0 = gtk_fixed_new();
     fixed___1 = gtk_fixed_new();
     gtk_container_add(GTK_CONTAINER(window), fixed___0);
     gtk_container_add(GTK_CONTAINER(popwindow), fixed___1);
+    gtk_widget_show(fixed___0);
+    gtk_widget_show(fixed___1);
 
     /*  */
     button1 = gtk_button_new_with_label("projector side");
+    gtk_fixed_put(GTK_FIXED(fixed___0), button1, 10, 10);
+    gtk_widget_show(button1);
+    
     button2 = gtk_button_new_with_label("oboject side");
+    gtk_fixed_put(GTK_FIXED(fixed___0), button2, 10, 60);
+    gtk_widget_show(button2);
+    
     button3 = gtk_button_new_with_label("Press 3");
+    gtk_fixed_put(GTK_FIXED(fixed___0), button3, 10, 110);
+    gtk_widget_show(button3);
+
     button_close = gtk_button_new_with_label("closer");
+    gtk_fixed_put(GTK_FIXED(fixed___0), button_close, 10, 160);
+    gtk_widget_show(button_close);
+    
     drawing_area_preview = gtk_image_new_from_pixbuf(pixbuf_preview);
+    gtk_fixed_put(GTK_FIXED(fixed___0), drawing_area_preview, 130, 10);
+    gtk_widget_show(drawing_area_preview);
+
+    // 카메라 제어 슬라이드
+    GtkWidget *slider_parameter_black;
+    slider_parameter_black = gtk_hscale_new_with_range ( 0 , 300 , 10 );
+    gtk_widget_set_size_request(slider_parameter_black, 100, 60);
+    gtk_fixed_put(GTK_FIXED(fixed___0), slider_parameter_black, 0, 500);
+    gtk_widget_show(slider_parameter_black);
+
+    GtkWidget *slider_parameter_white;
+    slider_parameter_white = gtk_hscale_new_with_range ( 0 , 300 , 10 );
+    gtk_widget_set_size_request(slider_parameter_white, 100, 60);
+    gtk_fixed_put(GTK_FIXED(fixed___0), slider_parameter_white, 0, 570);
+    gtk_widget_show(slider_parameter_white);
+
+    // 프리뷰
     drawing_area_graycode = gtk_image_new_from_pixbuf(pixbuf_graycode);
+    gtk_fixed_put(GTK_FIXED(fixed___1), drawing_area_graycode, 0, 0);
+    gtk_widget_show(drawing_area_graycode);
 
     /* connect button signal */
-    g_signal_connect(button1, "clicked", G_CALLBACK(move_button), (gpointer)fixed___0);
+    g_signal_connect(button1, "clicked", G_CALLBACK(move_button1), NULL);
+    g_signal_connect(button2, "clicked", G_CALLBACK(move_button2), NULL);
     g_signal_connect(button_close, "clicked", G_CALLBACK(close_button), NULL);
-
-    /*  */
-    gtk_fixed_put(GTK_FIXED(fixed___0), button1, 10, 10);
-    gtk_fixed_put(GTK_FIXED(fixed___0), button2, 10, 60);
-    gtk_fixed_put(GTK_FIXED(fixed___0), button3, 10, 110);
-    gtk_fixed_put(GTK_FIXED(fixed___0), button_close, 10, 160);
-    gtk_fixed_put(GTK_FIXED(fixed___0), drawing_area_preview, 130, 10);
-    gtk_fixed_put(GTK_FIXED(fixed___1), drawing_area_graycode, 0, 0);
-
-    /* Display the window */
-    gtk_widget_show(window);
-    //gtk_widget_show(popwindow);
-    gtk_widget_show(fixed___0);
-    gtk_widget_show(fixed___1);
-    gtk_widget_show(button1);
-    gtk_widget_show(button2);
-    gtk_widget_show(button3);
-    gtk_widget_show(button_close);
-    gtk_widget_show(drawing_area_preview);
-    gtk_widget_show(drawing_area_graycode);
+    //g_signal_connect(
+    //    button2, "clicked", G_CALLBACK(slider_camera_control), NULL);
 
     /* Enter the event loop */
     gtk_main();
@@ -1191,6 +1240,8 @@ void gui_main()
 //######################################################
 //#
 //######################################################
+
+Mat AAA, BBB, CCC;
 
 void graycode_map(Mat &aafsa, int scann_calib_switch = 0)
 {
@@ -1285,7 +1336,7 @@ void graycode_map(Mat &aafsa, int scann_calib_switch = 0)
 
     if (scann_calib_switch)
     {
-        ransac(aafsa);
+        //ransac(aafsa);
         //cordination_to_point(  aafsa,  plane_vectors,  1024,1024  );
     }
 
@@ -1353,78 +1404,110 @@ void triangulation(Mat &_p1, Mat &_p2, Mat &postion, float focus, int h, int w)
 
 }
 
-void processing()
+//void processing()
+//{
+//
+//    //cv::Mat p1(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(   0,   0,   0  )  );
+//    //cv::Mat p2(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(  10,  10,  10  )  );
+//    //float plane_vectors[] = {    0, 0, 1.0,    0, 0, 600.0    };
+//    //cordination_to_point(  gray,  plane_vectors,  1024,1024  );
+//
+//    Mat gray1;
+//    printf("graycode_map start \n");
+//
+//    graycode_window_on();
+//    graycode_map(gray1, 1);
+//    graycode_window_off();
+//    printf("cordination_to_point finish \n");
+//
+//    aaaaaaa(gray1, projector_map_shape_y, projector_map_shape_x);
+//    aaaaaaa0(gray1, projector_map_shape_y, projector_map_shape_x);
+//    aaaaaaa1(gray1, projector_map_shape_y, projector_map_shape_x);
+//    printf("owari \n");
+//
+//}
+
+void calib_projector_side()
 {
-
-    //cv::Mat p1(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(   0,   0,   0  )  );
-    //cv::Mat p2(  cv::Size(1024,  1024),  CV_32FC3,  Scalar(  10,  10,  10  )  );
-    //float plane_vectors[] = {    0, 0, 1.0,    0, 0, 600.0    };
-    //cordination_to_point(  gray,  plane_vectors,  1024,1024  );
-
-    Mat gray1;
-    printf("graycode_map start \n");
-
+    printf("calib_projector_side start \n");
     graycode_window_on();
-    graycode_map(gray1, 1);
+    graycode_map(AAA, 1);
     graycode_window_off();
-    printf("cordination_to_point finish \n");
-
-    aaaaaaa(gray1, projector_map_shape_y, projector_map_shape_x);
-    aaaaaaa0(gray1, projector_map_shape_y, projector_map_shape_x);
-    aaaaaaa1(gray1, projector_map_shape_y, projector_map_shape_x);
-    printf("owari \n");
-
+    printf("calib_projector_side owari \n");
 }
-
+void calib_object_side()
+{
+    printf("calib_object_side start \n");
+    graycode_window_on();
+    graycode_map(BBB, 1);
+    graycode_window_off();
+    printf("calib_object_side owari \n");
+}
+void scan_object()
+{
+    capture_viewer(CCC)
+    triangulation(AAA,BBB,CCC,600,1024,1024);
+}
 //######################################################
 //#
 //######################################################
 
+int capture_algorithm_state = 0;
+
 void thread_processing()
 {
-    //namedWindow("camera1", 1);
-    //namedWindow("camera2", 1);
-    sleep(3);
-    capture_algorithm_stop();
-    capture_algorithm_start();
+    capture_algorithm_state = 1;
     int counter = 0;
-    Mat retry;
+    sleep(3);
     while (1)
     {
-        if (flag_process_run)
-            sleep(2), processing(), printf("OKPRE\n"), flag_process_run = 0;
-        while (stop)
-            usleep(10000);
-        if (shutdown != stop)
+        if (shutdown)
+        {   
+            capture_algorithm_state = 0;
+            gtk_main_quit();
             break;
+        }
         usleep(10000);
+        if (flag_process_run)
+        {
+            if (flag_process_run == 1)
+                calib_projector_side();
+            else if (flag_process_run == 2)
+                calib_object_side();
+            else if (flag_process_run == 3)
+                scan_object();
+            flag_process_run = 0;
+            //processing(), printf("OKPRE\n"), 
+        }
         if (counter++ > 20)
+        {
+            static Mat retry;
             capture_viewer(retry), gui_preview_update(retry), counter = 0;
+        }
         printf("%d\n", counter);
     }
 }
 void thread_camera()
 {
+    VideoCapture cap(0 );
     if (!cap.isOpened())
         printf("카메라를 열수 없습니다. \n");
-    //cap.set( CAP_PROP_EXPOSURE, 0.1 );
     cap.set(CAP_PROP_FRAME_WIDTH, w);
     cap.set(CAP_PROP_FRAME_HEIGHT, h);
-    cap.set(CAP_PROP_ISO_SPEED, 100);
-    cap.set(CAP_PROP_FPS, 30);
+    cap.set(CAP_PROP_FPS, 13);
+    //cap.set(CAP_PROP_EXPOSURE, 0.1 );
+    //cap.set(CV_CAP_PROP_AUTO_EXPOSURE,0.25);
+    //cap.set(CAP_PROP_XI_AUTO_WB,0);
+    //cap.set(CAP_PROP_ISO_SPEED, 100);
     sleep(2);
-    //int counter = 0;
     while (1)
     {
-        capture_algorithm(cap);
-        while (stop)
-            usleep(10000);
-        if (shutdown != stop)
+        if (shutdown&(~capture_algorithm_state))
+        {
             break;
+        }
         usleep(10000);
-        //printf("thread_camera()  \n");
-        //counter++;
-        //printf("%d\n", counter);
+        capture_algorithm(cap);
     }
 }
 void thread_main()
@@ -1433,7 +1516,6 @@ void thread_main()
     //#
     //######################################################
     graycode_lookup_table(bit, Gray2Bin, Bin2Gray);
-
     //######################################################
     //#
     //######################################################
@@ -1450,13 +1532,54 @@ void thread_main()
 
 int main(int, char **)
 {
-
     thread hi0(thread_main);
     thread hi1(thread_camera);
     thread hi2(thread_processing);
     hi0.join();
     hi1.join();
     hi2.join();
-
     return 0;
 }
+
+/*
+*
+* User Controls
+*                      brightness 0x00980900 (int)    : min=0 max=100 step=1 default=50 value=50 flags=slider
+*                        contrast 0x00980901 (int)    : min=-100 max=100 step=1 default=0 value=0 flags=slider
+*                      saturation 0x00980902 (int)    : min=-100 max=100 step=1 default=0 value=0 flags=slider
+*                     red_balance 0x0098090e (int)    : min=1 max=7999 step=1 default=1000 value=1000 flags=slider
+*                    blue_balance 0x0098090f (int)    : min=1 max=7999 step=1 default=1000 value=1000 flags=slider
+*                 horizontal_flip 0x00980914 (bool)   : default=0 value=0
+*                   vertical_flip 0x00980915 (bool)   : default=0 value=0
+*            power_line_frequency 0x00980918 (menu)   : min=0 max=3 default=1 value=1
+*                       sharpness 0x0098091b (int)    : min=-100 max=100 step=1 default=0 value=0 flags=slider
+*                   color_effects 0x0098091f (menu)   : min=0 max=15 default=0 value=0
+*                          rotate 0x00980922 (int)    : min=0 max=360 step=90 default=0 value=0 flags=modify-layout
+*              color_effects_cbcr 0x0098092a (int)    : min=0 max=65535 step=1 default=32896 value=32896
+* 
+* Codec Controls
+*              video_bitrate_mode 0x009909ce (menu)   : min=0 max=1 default=0 value=0 flags=update
+*                   video_bitrate 0x009909cf (int)    : min=25000 max=25000000 step=25000 default=10000000 value=10000000
+*          repeat_sequence_header 0x009909e2 (bool)   : default=0 value=0
+*             h264_i_frame_period 0x00990a66 (int)    : min=0 max=2147483647 step=1 default=60 value=60
+*                      h264_level 0x00990a67 (menu)   : min=0 max=11 default=11 value=11
+*                    h264_profile 0x00990a6b (menu)   : min=0 max=4 default=4 value=4
+* 
+* Camera Controls
+*                   auto_exposure 0x009a0901 (menu)   : min=0 max=3 default=0 value=0
+*          exposure_time_absolute 0x009a0902 (int)    : min=1 max=10000 step=1 default=1000 value=1000
+*      exposure_dynamic_framerate 0x009a0903 (bool)   : default=0 value=0
+*              auto_exposure_bias 0x009a0913 (intmenu): min=0 max=24 default=12 value=12
+*       white_balance_auto_preset 0x009a0914 (menu)   : min=0 max=10 default=1 value=1
+*             image_stabilization 0x009a0916 (bool)   : default=0 value=0
+*                 iso_sensitivity 0x009a0917 (intmenu): min=0 max=4 default=0 value=0
+*            iso_sensitivity_auto 0x009a0918 (menu)   : min=0 max=1 default=1 value=1
+*          exposure_metering_mode 0x009a0919 (menu)   : min=0 max=2 default=0 value=0
+*                      scene_mode 0x009a091a (menu)   : min=0 max=13 default=0 value=0
+* 
+* JPEG Compression Controls
+*             compression_quality 0x009d0903 (int)    : min=1 max=100 step=1 default=30 value=30
+* 
+* v4l2-ctl --set-ctrl=brightness=0
+*
+*/
