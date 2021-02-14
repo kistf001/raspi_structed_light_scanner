@@ -201,6 +201,7 @@ void image_to_bit_stacking(Mat &stack, Mat &bit, int stage)
     stack = stack | (bit * (0b1 << stage));
 }
 
+
 void bit_to_cordination(
     Mat &horizontal, Mat &vertical, Mat &Map_hv, float focus,
     uint32_t h, uint32_t w, uint32_t h_im, uint32_t w_im)
@@ -964,18 +965,13 @@ void aaaaaaa1(Mat &qwerqer, int h, int w)
 //#
 //######################################################
 
-int flag_process_run = 0;
-
-int shutdown = 0;
+int flag_process_run = 0, shutdown = 0;
 
 GtkWidget *popwindow;
 
-GtkWidget *drawing_area_graycode;
-GtkWidget *drawing_area_preview;
-GdkPixbuf *pixbuf_graycode;
-GdkPixbuf *pixbuf_preview;
-guchar *pixels_graycode;
-guchar *pixels_preview;
+GtkWidget *drawing_area_graycode, *drawing_area_preview;
+GdkPixbuf *pixbuf_graycode, *pixbuf_preview;
+guchar *pixels_graycode, *pixels_preview;
 
 void graycode_window_on()
 {
@@ -992,19 +988,60 @@ static void close_button()
 }
 static void move_button1(GtkWidget *button)
 {
-    flag_process_run=1;
+    flag_process_run = 1;
 }
 static void move_button2(GtkWidget *button)
 {
-    flag_process_run=2;
+    flag_process_run = 2;
 }
-static void slider_camera_control_black(){
-    thresholder_black;
-    printf("setting runs\n");
+static void move_button3(GtkWidget *button)
+{
+    flag_process_run = 3;
 }
-static void slider_camera_control_white(){
-    thresholder_white;
-    printf("setting runs\n");
+static void move_button4(GtkWidget *button)
+{
+    flag_process_run = 4;
+}
+
+static void slider_camera_control_black(GtkRange *range, gpointer win)
+{
+    thresholder_black = gtk_range_get_value(range);
+    //printf("setting runs %d\n", thresholder_black);
+}
+static void slider_camera_control_white(GtkRange *range, gpointer win)
+{
+    thresholder_white = gtk_range_get_value(range);
+    //printf("setting runs %d\n", thresholder_white);
+}
+
+int v4l_auto_exposure = 1;
+int v4l_exposure_time_absolute = 500;
+int v4l_contrast = 0;
+int v4l_brightness = 50;
+static void v4l_apply(GtkWidget *button)
+{
+    int ret;
+    ret = system("v4l2-ctl --set-ctrl=auto_exposure=1");
+    ret = system("v4l2-ctl --set-ctrl=exposure_time_absolute=1000");
+    ret = system("v4l2-ctl --set-ctrl=contrast=0");
+    ret = system("v4l2-ctl --set-ctrl=brightness=50");
+
+    printf("v4l_apply\n");
+}
+static void v4l_set_exposure_time(GtkRange *range, gpointer win)
+{
+    v4l_exposure_time_absolute = gtk_range_get_value(range);
+    printf("v4l_set_exposure_time\n");
+}
+static void v4l_set_brightness(GtkRange *range, gpointer win)
+{
+    v4l_brightness = gtk_range_get_value(range);
+    printf("v4l_set_brightness\n");
+}
+static void v4l_set_contrast(GtkRange *range, gpointer win)
+{
+    v4l_contrast = gtk_range_get_value(range);
+    printf("v4l_set_contrast\n");
 }
 
 void gui_preview_update(Mat &qwerqer)
@@ -1139,6 +1176,7 @@ void gui_main()
     GtkWidget *button1;
     GtkWidget *button2;
     GtkWidget *button3;
+    GtkWidget *button4;
     GtkWidget *button_close;
     
     /*  */
@@ -1195,30 +1233,70 @@ void gui_main()
     gtk_fixed_put(GTK_FIXED(fixed___0), button2, 10, 60);
     gtk_widget_show(button2);
     
-    button3 = gtk_button_new_with_label("Press 3");
+    button3 = gtk_button_new_with_label("scan");
     gtk_fixed_put(GTK_FIXED(fixed___0), button3, 10, 110);
     gtk_widget_show(button3);
+    
+    button4 = gtk_button_new_with_label("data save");
+    gtk_fixed_put(GTK_FIXED(fixed___0), button4, 10, 160);
+    gtk_widget_show(button4);
 
     button_close = gtk_button_new_with_label("closer");
-    gtk_fixed_put(GTK_FIXED(fixed___0), button_close, 10, 160);
+    gtk_fixed_put(GTK_FIXED(fixed___0), button_close, 10, 210);
     gtk_widget_show(button_close);
     
     drawing_area_preview = gtk_image_new_from_pixbuf(pixbuf_preview);
     gtk_fixed_put(GTK_FIXED(fixed___0), drawing_area_preview, 130, 10);
     gtk_widget_show(drawing_area_preview);
 
-    // 카메라 제어 슬라이드
+    // 카메라 제어
     GtkWidget *slider_parameter_black;
     slider_parameter_black = gtk_hscale_new_with_range ( 0 , 300 , 10 );
     gtk_widget_set_size_request(slider_parameter_black, 100, 60);
     gtk_fixed_put(GTK_FIXED(fixed___0), slider_parameter_black, 0, 500);
     gtk_widget_show(slider_parameter_black);
-
     GtkWidget *slider_parameter_white;
     slider_parameter_white = gtk_hscale_new_with_range ( 0 , 300 , 10 );
     gtk_widget_set_size_request(slider_parameter_white, 100, 60);
     gtk_fixed_put(GTK_FIXED(fixed___0), slider_parameter_white, 0, 570);
     gtk_widget_show(slider_parameter_white);
+
+    GtkWidget *v4l_setting_apply;
+    v4l_setting_apply = gtk_button_new_with_label("apply");
+    gtk_widget_set_size_request(slider_parameter_black, 100, 60);
+    gtk_fixed_put(GTK_FIXED(fixed___0), v4l_setting_apply, 10, 260);
+    gtk_widget_show(v4l_setting_apply);
+
+    //value, lower, upper, step_increment, page_increment, page_size
+    GtkWidget *v4l_setting_exp_time_abs;
+    GtkObject *v4l_setting_exp_time_abs_obj;
+    v4l_setting_exp_time_abs_obj = gtk_adjustment_new (
+        1000, 100, 10000, 10, 100, 4);
+    v4l_setting_exp_time_abs = gtk_hscale_new ( 
+        GTK_ADJUSTMENT (v4l_setting_exp_time_abs_obj) );
+    gtk_widget_set_size_request(v4l_setting_exp_time_abs, 100, 60);
+    gtk_fixed_put(GTK_FIXED(fixed___0), v4l_setting_exp_time_abs, 100, 570);
+    gtk_widget_show(v4l_setting_exp_time_abs);
+
+    GtkWidget *v4l_setting_contrast;
+    GtkObject *v4l_setting_contrast_obj;
+    v4l_setting_contrast_obj = gtk_adjustment_new (
+        0, -100, 100, 1, 3, 10);
+    v4l_setting_contrast = gtk_hscale_new ( 
+        GTK_ADJUSTMENT (v4l_setting_contrast_obj) );
+    gtk_widget_set_size_request(v4l_setting_contrast, 100, 60);
+    gtk_fixed_put(GTK_FIXED(fixed___0), v4l_setting_contrast, 250, 570);
+    gtk_widget_show(v4l_setting_contrast);
+
+    GtkWidget *v4l_setting_brightness;
+    GtkObject *v4l_setting_brightness_obj;
+    v4l_setting_brightness_obj = gtk_adjustment_new (
+        50, 0, 100, 1, 30, 2);
+    v4l_setting_brightness = gtk_hscale_new ( 
+        GTK_ADJUSTMENT (v4l_setting_brightness_obj) );
+    gtk_widget_set_size_request(v4l_setting_brightness, 100, 60);
+    gtk_fixed_put(GTK_FIXED(fixed___0), v4l_setting_brightness, 400, 570);
+    gtk_widget_show(v4l_setting_brightness);
 
     // 프리뷰
     drawing_area_graycode = gtk_image_new_from_pixbuf(pixbuf_graycode);
@@ -1228,7 +1306,19 @@ void gui_main()
     /* connect button signal */
     g_signal_connect(button1, "clicked", G_CALLBACK(move_button1), NULL);
     g_signal_connect(button2, "clicked", G_CALLBACK(move_button2), NULL);
+    g_signal_connect(button3, "clicked", G_CALLBACK(move_button3), NULL);
+    g_signal_connect(button4, "clicked", G_CALLBACK(move_button4), NULL);
     g_signal_connect(button_close, "clicked", G_CALLBACK(close_button), NULL);
+    
+    g_signal_connect(
+        slider_parameter_black, "value-changed", 
+        G_CALLBACK(slider_camera_control_black), NULL);
+    g_signal_connect(
+        slider_parameter_white, "value-changed", 
+        G_CALLBACK(slider_camera_control_white), NULL);
+
+    g_signal_connect(v4l_setting_apply, "clicked", G_CALLBACK(v4l_apply), NULL);
+
     //g_signal_connect(
     //    button2, "clicked", G_CALLBACK(slider_camera_control), NULL);
 
@@ -1364,7 +1454,7 @@ void triangulation(Mat &_p1, Mat &_p2, Mat &postion, float focus, int h, int w)
             if (image_map[a] * image_map[a + 1] * image_map[a + 2])
             {
                 // theta 구하기
-                float theta = image_map[a] / focus;
+                float theta = -(image_map[a] / focus);
                 // rad 구하기
                 float rad = atan(theta);
                 // 회전변환
@@ -1390,16 +1480,12 @@ void triangulation(Mat &_p1, Mat &_p2, Mat &postion, float focus, int h, int w)
 
     //    theta = -np.true_divide(  yx[0:,0:,0],  focus  )
     //    #print("theta map [yx => xyz]: ",yx.shape)
-    //
     //    rad = np.arctan(theta)
     //    #print("rad map [yx => xyz]: ",yx.shape)
-    //
     //    sin = np.sin(rad)
     //    cos = np.cos(rad)
-    //
     //    xxxxxxxx = (plane_map[0:,0:,0] * cos) - (plane_map[0:,0:,2] * sin)
     //    yyyyyyyy = (plane_map[0:,0:,0] * sin) + (plane_map[0:,0:,2] * cos)
-    //
     //    adadsdas = np.sqrt(xxxxxxxx*xxxxxxxx) + np.sqrt(yyyyyyyy*yyyyyyyy)
 
 }
@@ -1445,9 +1531,20 @@ void calib_object_side()
 }
 void scan_object()
 {
-    capture_viewer(CCC)
+    printf("scan_object start \n");
+    graycode_map(CCC, 0);
     triangulation(AAA,BBB,CCC,600,1024,1024);
+    printf("scan_object end \n");
 }
+void scan_data_save()
+{
+    printf("scan data save start \n");
+    aaaaaaa(AAA, projector_map_shape_y, projector_map_shape_x);
+    aaaaaaa0(AAA, projector_map_shape_y, projector_map_shape_x);
+    aaaaaaa1(AAA, projector_map_shape_y, projector_map_shape_x);
+    printf("scan data save end \n");
+}
+
 //######################################################
 //#
 //######################################################
@@ -1476,8 +1573,9 @@ void thread_processing()
                 calib_object_side();
             else if (flag_process_run == 3)
                 scan_object();
+            else if (flag_process_run == 4)
+                scan_data_save();
             flag_process_run = 0;
-            //processing(), printf("OKPRE\n"), 
         }
         if (counter++ > 20)
         {
