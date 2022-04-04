@@ -49,6 +49,7 @@ def lamp(a=0):
         return np.ones((1024,1024),np.float32)
 
 Gray2Bin,Bin2Gray = graycode_lookup_table( setting.resolution_bit )
+
 if __name__ == "__main__":
     
     import cv2
